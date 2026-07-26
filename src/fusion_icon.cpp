@@ -3,18 +3,11 @@
 #include <cstdlib>
 #include <csignal>
 #include <unistd.h>
-#include <sys/wait.h>
 #include <fstream>
 #include <sstream>
 #include <map>
 
 bool debug_mode = false;
-
-// Собирает зомби-детей (WM, декораторы), чтобы не висели в ps
-static void sigchld_handler(int) {
-    int status;
-    while (waitpid(-1, &status, WNOHANG) > 0) {}
-}
 
 static void silent_log(const gchar*, GLogLevelFlags, const gchar*, gpointer) {}
 
@@ -361,40 +354,23 @@ void FusionIcon::change_window_manager(const std::string& wm) {
     g_message("Switching to %s...", wm.c_str());
 
     try {
-        pid_t pid = fork();
-
-        if (pid == 0) {
-            setsid();
-            signal(SIGINT, SIG_IGN);
-            signal(SIGHUP, SIG_IGN);
-            signal(SIGTERM, SIG_IGN);
-
-            std::vector<const char*> args;
-            args.push_back(wm.c_str());
-            args.push_back("--replace");
-
-            if (wm == "compiz") {
-                if (indirect_rendering) args.push_back("--indirect-rendering");
-                if (loose_binding) args.push_back("--loose-binding");
-            }
-
-            args.push_back(nullptr);
-
-            execvp(wm.c_str(), const_cast<char* const*>(args.data()));
-            _exit(1);
-        } else if (pid > 0) {
-            g_message("%s started with PID %d", wm.c_str(), pid);
-            // Переключаемся в активный режим мониторинга
-            active_monitoring = true;
-            // Проверяем 4 раза по 500мс — если не запустился, повторяем
-            std::string check_cmd = "for i in 1 2 3 4; do sleep 0.5; pgrep -x " + wm + " > /dev/null 2>&1 && exit 0; done; notify-send 'Fusion Icon 2' '" + wm + " failed to start, retrying...' && setsid " + wm + " --replace &";
-            int ret = std::system(("bash -c '" + check_cmd + "' &").c_str());
-            (void)ret;
-        } else {
-            g_warning("Error forking process for %s", wm.c_str());
+        std::string cmd = "setsid " + wm + " --replace";
+        if (wm == "compiz") {
+            if (indirect_rendering) cmd += " --indirect-rendering";
+            if (loose_binding) cmd += " --loose-binding";
         }
-    } catch (const std::exception& error) {
-        g_warning("Error switching to %s: %s", wm.c_str(), error.what());
+
+        Glib::spawn_command_line_async(cmd);
+        g_message("%s started", wm.c_str());
+        active_monitoring = true;
+
+        // Проверяем 4 раза по 500мс — если не запустился, повторяем
+        std::string pgrep_cmd = "pgrep -x " + wm;
+        std::string check_cmd = "for i in 1 2 3 4; do sleep 0.5; " + pgrep_cmd + " > /dev/null 2>&1 && exit 0; done; notify-send 'Fusion Icon 2' '" + wm + " failed to start, retrying...' && setsid " + wm + " --replace &";
+        int ret = std::system(("bash -c '" + check_cmd + "' &").c_str());
+        (void)ret;
+    } catch (const Glib::Error& error) {
+        g_warning("Error switching to %s: %s", wm.c_str(), error.what().c_str());
     }
 }
 
@@ -448,9 +424,11 @@ std::string FusionIcon::detect_window_decorator(const std::string& wm) {
 void FusionIcon::change_window_decorator(const std::string& decorator) {
     g_message("Switching decorator to %s...", decorator.c_str());
 
-    std::string cmd = "setsid " + decorator + " --replace &";
-    int ret = std::system(cmd.c_str());
-    (void)ret;
+    try {
+        Glib::spawn_command_line_async("setsid " + decorator + " --replace");
+    } catch (const Glib::Error& error) {
+        g_warning("Error switching decorator to %s: %s", decorator.c_str(), error.what().c_str());
+    }
 
     std::string pgrep_cmd = (decorator == "emerald") ? "pgrep -x emerald" : "pgrep -f gtk-window-decorator";
     std::string check_cmd = "for i in 1 2 3 4; do sleep 0.5; " + pgrep_cmd + " > /dev/null 2>&1 && exit 0; done; notify-send 'Fusion Icon 2' '" + decorator + " failed to start, retrying...' && setsid " + decorator + " --replace &";
@@ -727,13 +705,5 @@ int main(int argc, char* argv[]) {
 
     Gtk::Main kit(argc, argv);
     FusionIcon fusionIcon;
-
-    // SIGCHLD handler: собирает зомби-процессы (WM, декораторы).
-    // Ставим ПОСЛЕ GTK init, чтобы GLib не перезатёр хендлер.
-    struct sigaction sa = {};
-    sa.sa_handler = sigchld_handler;
-    sa.sa_flags = SA_RESTART | SA_NOCLDSTOP;
-    sigaction(SIGCHLD, &sa, nullptr);
-
     Gtk::Main::run();
 }
