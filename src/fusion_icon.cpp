@@ -294,7 +294,16 @@ std::string FusionIcon::detect_window_decorator() {
 void FusionIcon::change_window_decorator(const std::string& decorator) {
     g_message("Switching decorator to %s...", decorator.c_str());
 
-    // Просто запускаем с --replace, пусть победит сильнейший
+    // Убиваем другой декоратор, чтобы не висел мёртвым грузом
+    if (decorator == "emerald") {
+        int ret = std::system("killall -q gtk-window-decorator 2>/dev/null");
+        (void)ret;
+    } else {
+        int ret = std::system("killall -q emerald 2>/dev/null");
+        (void)ret;
+    }
+
+    // Запускаем новый декоратор с --replace
     std::string cmd = "setsid " + decorator + " --replace &";
     int ret = std::system(cmd.c_str());
     (void)ret;
@@ -363,6 +372,12 @@ void FusionIcon::rebuild_wm_menu() {
         add_item("metacity", "metacity");
 
     wm_menu.show_all();
+
+    // Если WM не compiz — убиваем emerald (он только для compiz)
+    if (current_wm != "compiz") {
+        int ret = std::system("pgrep -x emerald > /dev/null 2>&1 && killall -q emerald 2>/dev/null");
+        (void)ret;
+    }
 }
 
 void FusionIcon::start_compiz_setsid() {
