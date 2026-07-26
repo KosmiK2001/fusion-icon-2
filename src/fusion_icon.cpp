@@ -403,9 +403,12 @@ bool FusionIcon::monitor_state() {
             else
                 parent_img->set_from_icon_name("compiz", Gtk::ICON_SIZE_MENU);
         }
+
+        // Пересоздаём пункты подменю
+        rebuild_wm_menu();
+        rebuild_decorator_menu();
     }
 
-    // Если в активном режиме — перезапускаем таймер на 500мс
     if (active_monitoring) {
         Glib::signal_timeout().connect_once([this]() { this->monitor_state(); }, 500);
         return false;
