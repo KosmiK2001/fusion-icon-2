@@ -38,6 +38,7 @@ private:
     Gtk::Menu decorator_menu;
     Gtk::ImageMenuItem* item_select_decorator;
     bool gtk_window_decorator_installed;
+    bool nvidia_installed;
     bool compiz_installed;
     bool ccsm_installed;
     bool metacity_installed;
@@ -70,6 +71,7 @@ FusionIcon::FusionIcon() : compiz_restarted(false), compiz_started_by_fusion_ico
     marco_installed = (std::system("which marco > /dev/null 2>&1") == 0);
     emerald_installed = (std::system("which emerald-theme-manager > /dev/null 2>&1") == 0);
     gtk_window_decorator_installed = (std::system("which gtk-window-decorator > /dev/null 2>&1") == 0);
+    nvidia_installed = (std::system("lsmod 2>/dev/null | grep -q nvidia") == 0);
 
     std::string current_desktop = detect_desktop_name();
     std::string window_manager = detect_window_manager();
@@ -177,6 +179,50 @@ FusionIcon::FusionIcon() : compiz_restarted(false), compiz_started_by_fusion_ico
         decorator_menu.signal_show().connect(sigc::mem_fun(*this, &FusionIcon::rebuild_decorator_menu));
 
         menu.append(*item_select_decorator);
+    }
+
+    // NVIDIA Options submenu
+    if (nvidia_installed) {
+        Gtk::Menu nvidia_menu;
+        Gtk::ImageMenuItem* item_nvidia;
+
+        {
+            auto* img = Gtk::manage(new Gtk::Image());
+            img->set_from_icon_name("nvidia", Gtk::ICON_SIZE_MENU);
+            item_nvidia = Gtk::manage(new Gtk::ImageMenuItem(*img, "NVIDIA Options"));
+        }
+        item_nvidia->set_submenu(nvidia_menu);
+
+        // Force Composition Pipeline
+        auto* item_fcp = Gtk::manage(new Gtk::CheckMenuItem("Force Composition Pipeline"));
+        item_fcp->signal_toggled().connect([this, item_fcp]() {
+            if (item_fcp->get_active()) {
+                g_message("Enabling Force Composition Pipeline...");
+                int r = std::system("xrandr --output $(xrandr | grep ' connected' | head -1 | cut -d' ' -f1) --set ForceCompositionPipeline On 2>/dev/null || true"); (void)r;
+            } else {
+                g_message("Disabling Force Composition Pipeline...");
+                int r = std::system("xrandr --output $(xrandr | grep ' connected' | head -1 | cut -d' ' -f1) --set ForceCompositionPipeline Off 2>/dev/null || true"); (void)r;
+            }
+        });
+        nvidia_menu.append(*item_fcp);
+
+        // Force Full Composition Pipeline
+        auto* item_ffcp = Gtk::manage(new Gtk::CheckMenuItem("Force Full Composition Pipeline"));
+        item_ffcp->signal_toggled().connect([this, item_fcp, item_ffcp]() {
+            if (item_ffcp->get_active()) {
+                g_message("Enabling Force Full Composition Pipeline...");
+                item_fcp->set_active(true);
+                item_fcp->set_sensitive(false);
+                int r = std::system("xrandr --output $(xrandr | grep ' connected' | head -1 | cut -d' ' -f1) --set ForceFullCompositionPipeline On 2>/dev/null || true"); (void)r;
+            } else {
+                g_message("Disabling Force Full Composition Pipeline...");
+                item_fcp->set_sensitive(true);
+                int r = std::system("xrandr --output $(xrandr | grep ' connected' | head -1 | cut -d' ' -f1) --set ForceFullCompositionPipeline Off 2>/dev/null || true"); (void)r;
+            }
+        });
+        nvidia_menu.append(*item_ffcp);
+
+        menu.append(*item_nvidia);
     }
 
     {
