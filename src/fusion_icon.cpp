@@ -356,25 +356,23 @@ void FusionIcon::on_right_click(guint button, guint time) {
 void FusionIcon::change_window_manager(const std::string& wm) {
     g_message("Switching to %s...", wm.c_str());
 
-    try {
-        std::string cmd = "setsid " + wm + " --replace";
-        if (wm == "compiz") {
-            if (indirect_rendering) cmd += " --indirect-rendering";
-            if (loose_binding) cmd += " --loose-binding";
-        }
-
-        Glib::spawn_command_line_async(cmd);
-        g_message("%s started", wm.c_str());
-        active_monitoring = true;
-
-        // Проверяем 4 раза по 500мс — если не запустился, повторяем
-        std::string pgrep_cmd = "pgrep -x " + wm;
-        std::string check_cmd = "for i in 1 2 3 4; do sleep 0.5; " + pgrep_cmd + " > /dev/null 2>&1 && exit 0; done; notify-send 'Fusion Icon 2' '" + wm + " failed to start, retrying...' && setsid " + wm + " --replace &";
-        int ret = std::system(("bash -c '" + check_cmd + "' &").c_str());
-        (void)ret;
-    } catch (const Glib::Error& error) {
-        g_warning("Error switching to %s: %s", wm.c_str(), error.what().c_str());
+    std::string cmd = "setsid " + wm + " --replace";
+    if (wm == "compiz") {
+        if (indirect_rendering) cmd += " --indirect-rendering";
+        if (loose_binding) cmd += " --loose-binding";
     }
+    cmd += " &";
+
+    int ret = std::system(cmd.c_str());
+    (void)ret;
+    g_message("%s started", wm.c_str());
+    active_monitoring = true;
+
+    // Проверяем 4 раза по 500мс — если не запустился, повторяем
+    std::string pgrep_cmd = "pgrep -x " + wm;
+    std::string check_cmd = "for i in 1 2 3 4; do sleep 0.5; " + pgrep_cmd + " > /dev/null 2>&1 && exit 0; done; notify-send 'Fusion Icon 2' '" + wm + " failed to start, retrying...' && setsid " + wm + " --replace &";
+    ret = std::system(("bash -c '" + check_cmd + "' &").c_str());
+    (void)ret;
 }
 
 std::string FusionIcon::detect_desktop_name() {
@@ -427,11 +425,9 @@ std::string FusionIcon::detect_window_decorator(const std::string& wm) {
 void FusionIcon::change_window_decorator(const std::string& decorator) {
     g_message("Switching decorator to %s...", decorator.c_str());
 
-    try {
-        Glib::spawn_command_line_async("setsid " + decorator + " --replace");
-    } catch (const Glib::Error& error) {
-        g_warning("Error switching decorator to %s: %s", decorator.c_str(), error.what().c_str());
-    }
+    std::string cmd = "setsid " + decorator + " --replace &";
+    int ret = std::system(cmd.c_str());
+    (void)ret;
 
     std::string pgrep_cmd = (decorator == "emerald") ? "pgrep -x emerald" : "pgrep -f gtk-window-decorator";
     std::string check_cmd = "for i in 1 2 3 4; do sleep 0.5; " + pgrep_cmd + " > /dev/null 2>&1 && exit 0; done; notify-send 'Fusion Icon 2' '" + decorator + " failed to start, retrying...' && setsid " + decorator + " --replace &";
