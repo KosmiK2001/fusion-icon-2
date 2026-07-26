@@ -248,17 +248,16 @@ std::string FusionIcon::detect_desktop_name() {
 std::string FusionIcon::detect_window_manager() {
     const char* wm_list[] = {"compiz", "marco", "metacity"};
     for (const char* wm : wm_list) {
-        std::string cmd = "ps aux | grep -v grep | grep -q " + std::string(wm);
-        if (std::system(cmd.c_str()) == 0)
+        if (std::system(("pgrep -f " + std::string(wm) + " > /dev/null 2>&1").c_str()) == 0)
             return wm;
     }
     return "Unknown";
 }
 
 std::string FusionIcon::detect_window_decorator() {
-    if (std::system("ps aux | grep -v grep | grep -q emerald") == 0)
+    if (std::system("pgrep -f emerald > /dev/null 2>&1") == 0)
         return "emerald";
-    if (std::system("ps aux | grep -v grep | grep -q gtk-window-decorator") == 0)
+    if (std::system("pgrep -f gtk-window-decorator > /dev/null 2>&1") == 0)
         return "gtk-window-decorator";
     return "Unknown";
 }
