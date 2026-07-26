@@ -199,11 +199,21 @@ FusionIcon::FusionIcon() : compiz_restarted(false), compiz_started_by_fusion_ico
         auto* item_fcp = Gtk::manage(new Gtk::CheckMenuItem("Force Composition Pipeline"));
         item_fcp->signal_toggled().connect([this, item_fcp]() {
             if (item_fcp->get_active()) {
-                g_message("Enabling Force Composition Pipeline...");
-                int r = std::system("nvidia-settings --assign 'CurrentMetaMode=DPY-1: nvidia-auto-select @1920x1080 +0+0 {ForceCompositionPipeline=On,ForceFullCompositionPipeline=Off}' 2>/dev/null"); (void)r;
+                int r = std::system("nvidia-settings --assign 'CurrentMetaMode=DPY-1: nvidia-auto-select @1920x1080 +0+0 {ForceCompositionPipeline=On,ForceFullCompositionPipeline=Off}' > /dev/null 2>&1"); (void)r;
+                FILE* p = popen("nvidia-settings -q CurrentMetaMode 2>/dev/null | grep -o 'ForceCompositionPipeline=[A-Za-z]*'", "r");
+                char buf[64] = {0};
+                std::string state = "unknown";
+                if (p && fgets(buf, sizeof(buf), p)) { buf[strcspn(buf, "\n")] = 0; state = buf; }
+                if (p) pclose(p);
+                g_message("Force Composition Pipeline... [%s]", state.c_str());
             } else {
-                g_message("Disabling Force Composition Pipeline...");
-                int r = std::system("nvidia-settings --assign 'CurrentMetaMode=DPY-1: nvidia-auto-select @1920x1080 +0+0 {ForceCompositionPipeline=Off,ForceFullCompositionPipeline=Off}' 2>/dev/null"); (void)r;
+                int r = std::system("nvidia-settings --assign 'CurrentMetaMode=DPY-1: nvidia-auto-select @1920x1080 +0+0 {ForceCompositionPipeline=Off,ForceFullCompositionPipeline=Off}' > /dev/null 2>&1"); (void)r;
+                FILE* p = popen("nvidia-settings -q CurrentMetaMode 2>/dev/null | grep -o 'ForceCompositionPipeline=[A-Za-z]*'", "r");
+                char buf[64] = {0};
+                std::string state = "unknown";
+                if (p && fgets(buf, sizeof(buf), p)) { buf[strcspn(buf, "\n")] = 0; state = buf; }
+                if (p) pclose(p);
+                g_message("Force Composition Pipeline... [%s]", state.c_str());
             }
         });
         nvidia_menu.append(*item_fcp);
@@ -212,14 +222,24 @@ FusionIcon::FusionIcon() : compiz_restarted(false), compiz_started_by_fusion_ico
         auto* item_ffcp = Gtk::manage(new Gtk::CheckMenuItem("Force Full Composition Pipeline"));
         item_ffcp->signal_toggled().connect([this, item_fcp, item_ffcp]() {
             if (item_ffcp->get_active()) {
-                g_message("Enabling Force Full Composition Pipeline...");
                 item_fcp->set_active(true);
                 item_fcp->set_sensitive(false);
-                int r = std::system("nvidia-settings --assign 'CurrentMetaMode=DPY-1: nvidia-auto-select @1920x1080 +0+0 {ForceCompositionPipeline=On,ForceFullCompositionPipeline=On}' 2>/dev/null"); (void)r;
+                int r = std::system("nvidia-settings --assign 'CurrentMetaMode=DPY-1: nvidia-auto-select @1920x1080 +0+0 {ForceCompositionPipeline=On,ForceFullCompositionPipeline=On}' > /dev/null 2>&1"); (void)r;
+                FILE* p = popen("nvidia-settings -q CurrentMetaMode 2>/dev/null | grep -o 'ForceFullCompositionPipeline=[A-Za-z]*'", "r");
+                char buf[64] = {0};
+                std::string state = "unknown";
+                if (p && fgets(buf, sizeof(buf), p)) { buf[strcspn(buf, "\n")] = 0; state = buf; }
+                if (p) pclose(p);
+                g_message("Force Full Composition Pipeline... [%s]", state.c_str());
             } else {
-                g_message("Disabling Force Full Composition Pipeline...");
                 item_fcp->set_sensitive(true);
-                int r = std::system("nvidia-settings --assign 'CurrentMetaMode=DPY-1: nvidia-auto-select @1920x1080 +0+0 {ForceCompositionPipeline=Off,ForceFullCompositionPipeline=Off}' 2>/dev/null"); (void)r;
+                int r = std::system("nvidia-settings --assign 'CurrentMetaMode=DPY-1: nvidia-auto-select @1920x1080 +0+0 {ForceCompositionPipeline=Off,ForceFullCompositionPipeline=Off}' > /dev/null 2>&1"); (void)r;
+                FILE* p = popen("nvidia-settings -q CurrentMetaMode 2>/dev/null | grep -o 'ForceFullCompositionPipeline=[A-Za-z]*'", "r");
+                char buf[64] = {0};
+                std::string state = "unknown";
+                if (p && fgets(buf, sizeof(buf), p)) { buf[strcspn(buf, "\n")] = 0; state = buf; }
+                if (p) pclose(p);
+                g_message("Force Full Composition Pipeline... [%s]", state.c_str());
             }
         });
         nvidia_menu.append(*item_ffcp);
