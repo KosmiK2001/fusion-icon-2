@@ -106,6 +106,20 @@ FusionIcon::FusionIcon() : compiz_restarted(false), compiz_started_by_fusion_ico
     if (window_manager != "Unknown")	{ g_message("WM: %s", window_manager.c_str()); }
 	else								{ g_warning("No WM detected at all!"); start_compiz_setsid(); }
 
+    // Применяем настройки из конфига если отличаются от текущего
+    std::string cfg_wm = config["selected_wm"];
+    if (!cfg_wm.empty() && cfg_wm != "Unknown" && cfg_wm != window_manager) {
+        g_message("Config WM (%s) differs from current (%s), switching...", cfg_wm.c_str(), window_manager.c_str());
+        change_window_manager(cfg_wm);
+    }
+
+    std::string cfg_dec = config["selected_decorator"];
+    std::string cur_dec = detect_window_decorator();
+    if (!cfg_dec.empty() && cfg_dec != "none" && cfg_dec != cur_dec) {
+        g_message("Config decorator (%s) differs from current (%s), switching...", cfg_dec.c_str(), cur_dec.c_str());
+        change_window_decorator(cfg_dec);
+    }
+
     icon->signal_activate().connect(sigc::mem_fun(*this, &FusionIcon::on_left_click));
     icon->signal_popup_menu().connect(sigc::mem_fun(*this, &FusionIcon::on_right_click));
 
