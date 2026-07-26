@@ -367,8 +367,10 @@ void FusionIcon::rebuild_wm_menu() {
     if (parent_img) {
         if (current_wm == "compiz")
             parent_img->set_from_icon_name("compiz", Gtk::ICON_SIZE_MENU);
-        else if (current_wm == "marco")
-            parent_img->set_from_icon_name("marco", Gtk::ICON_SIZE_MENU);
+        else if (current_wm == "marco") {
+            Glib::RefPtr<Gdk::Pixbuf> pb = Gdk::Pixbuf::create_from_file(ICON_DIR "/marco.png");
+            parent_img->set(pb->scale_simple(24, 24, Gdk::INTERP_BILINEAR));
+        }
         else if (current_wm == "metacity")
             parent_img->set_from_icon_name("metacity", Gtk::ICON_SIZE_MENU);
         else
@@ -383,9 +385,10 @@ void FusionIcon::rebuild_wm_menu() {
 
     auto add_item = [&](const std::string& wm, const char* icon_name) {
         auto* img = Gtk::manage(new Gtk::Image());
-        if (wm == "marco")
-            img->set_from_icon_name("marco", Gtk::ICON_SIZE_MENU);
-        else
+        if (wm == "marco") {
+            Glib::RefPtr<Gdk::Pixbuf> pb = Gdk::Pixbuf::create_from_file(ICON_DIR "/marco.png");
+            img->set(pb->scale_simple(24, 24, Gdk::INTERP_BILINEAR));
+        } else
             img->set_from_icon_name(icon_name, Gtk::ICON_SIZE_MENU);
         auto* item = Gtk::manage(new Gtk::ImageMenuItem(*img, wm));
 
@@ -459,8 +462,10 @@ bool FusionIcon::monitor_state() {
         if (parent_img) {
             if (current_wm == "compiz")
                 parent_img->set_from_icon_name("compiz", Gtk::ICON_SIZE_MENU);
-            else if (current_wm == "marco")
-                parent_img->set_from_icon_name("marco", Gtk::ICON_SIZE_MENU);
+            else if (current_wm == "marco") {
+                Glib::RefPtr<Gdk::Pixbuf> pb = Gdk::Pixbuf::create_from_file(ICON_DIR "/marco.png");
+                parent_img->set(pb->scale_simple(24, 24, Gdk::INTERP_BILINEAR));
+            }
             else if (current_wm == "metacity")
                 parent_img->set_from_icon_name("metacity", Gtk::ICON_SIZE_MENU);
             else
@@ -512,31 +517,36 @@ int main(int argc, char* argv[]) {
         g_log_set_default_handler(silent_log, nullptr);
     } else {
         // Выводим информацию о GPU в debug режиме
-        FILE* gpu_pipe = popen("lspci | grep -i 'vga\\|3d' | head -1 | sed 's/.*: //'", "r");
+        std::string gpu_info;
+        FILE* gpu_pipe = popen("lspci | grep -i 'vga\\|3d' | head -1", "r");
         if (gpu_pipe) {
-            char gpu_info[256] = {0};
-            if (fgets(gpu_info, sizeof(gpu_info), gpu_pipe)) {
-                gpu_info[strcspn(gpu_info, "\n")] = 0;
-                // Извлекаем только модель (без ревизии)
-                char* rev = strstr(gpu_info, " (rev");
-                if (rev) *rev = 0;
-                fprintf(stderr, "GPU: %s", gpu_info);
+            char buf[256] = {0};
+            if (fgets(buf, sizeof(buf), gpu_pipe)) {
+                buf[strcspn(buf, "\n")] = 0;
+                // Извлекаем только модель: "NVIDIA Corporation GM204 [GeForce GTX 970]"
+                char* bracket = strchr(buf, '[');
+                char* rev = strstr(buf, " (rev");
+                if (bracket) {
+                    char* end = strchr(bracket, ']');
+                    if (end) {
+                        *end = 0;
+                        gpu_info = std::string(bracket + 1);
+                    }
+                }
             }
             pclose(gpu_pipe);
         }
         FILE* drv_pipe = popen("nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null | head -1", "r");
         if (drv_pipe) {
-            char drv_info[64] = {0};
-            if (fgets(drv_info, sizeof(drv_info), drv_pipe)) {
-                drv_info[strcspn(drv_info, "\n")] = 0;
-                if (strlen(drv_info) > 0)
-                    fprintf(stderr, ", Driver: %s\n", drv_info);
-                else
-                    fprintf(stderr, "\n");
+            char drv[64] = {0};
+            if (fgets(drv, sizeof(drv), drv_pipe)) {
+                drv[strcspn(drv, "\n")] = 0;
+                if (strlen(drv) > 0 && !gpu_info.empty())
+                    g_message("%s, %s", gpu_info.c_str(), drv);
+                else if (!gpu_info.empty())
+                    g_message("%s", gpu_info.c_str());
             }
             pclose(drv_pipe);
-        } else {
-            fprintf(stderr, "\n");
         }
     }
 
