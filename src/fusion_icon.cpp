@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <csignal>
 #include <unistd.h>
+#include <sys/wait.h>
 #include <fstream>
 #include <sstream>
 #include <map>
@@ -354,29 +355,43 @@ void FusionIcon::change_window_manager(const std::string& wm) {
     g_message("Switching to %s...", wm.c_str());
 
     try {
+        // Double-fork: промежуточный дочерний сразу завершается,
+        // внук (реальный WM) уходит к init и не становится зомби.
         pid_t pid = fork();
 
         if (pid == 0) {
-            setsid();
-            signal(SIGINT, SIG_IGN);
-            signal(SIGHUP, SIG_IGN);
-            signal(SIGTERM, SIG_IGN);
+            // Промежуточный дочерний процесс
+            pid_t grandchild = fork();
 
-            std::vector<const char*> args;
-            args.push_back(wm.c_str());
-            args.push_back("--replace");
+            if (grandchild == 0) {
+                // Внук — запускаем WM
+                setsid();
+                signal(SIGINT, SIG_IGN);
+                signal(SIGHUP, SIG_IGN);
+                signal(SIGTERM, SIG_IGN);
 
-            if (wm == "compiz") {
-                if (indirect_rendering) args.push_back("--indirect-rendering");
-                if (loose_binding) args.push_back("--loose-binding");
+                std::vector<const char*> args;
+                args.push_back(wm.c_str());
+                args.push_back("--replace");
+
+                if (wm == "compiz") {
+                    if (indirect_rendering) args.push_back("--indirect-rendering");
+                    if (loose_binding) args.push_back("--loose-binding");
+                }
+
+                args.push_back(nullptr);
+
+                execvp(wm.c_str(), const_cast<char* const*>(args.data()));
+                _exit(1);
+            } else if (grandchild > 0) {
+                _exit(0); // Промежуточный завершается, внук → reparent к init
+            } else {
+                _exit(1);
             }
-
-            args.push_back(nullptr);
-
-            execvp(wm.c_str(), const_cast<char* const*>(args.data()));
-            _exit(1);
         } else if (pid > 0) {
-            g_message("%s started with PID %d", wm.c_str(), pid);
+            // Ждём завершения промежуточного дочернего (мгновенно)
+            waitpid(pid, nullptr, 0);
+            g_message("%s started", wm.c_str());
             // Переключаемся в активный режим мониторинга
             active_monitoring = true;
             // Проверяем 4 раза по 500мс — если не запустился, повторяем
