@@ -20,7 +20,7 @@ public:
     void rebuild_wm_menu();
     void rebuild_decorator_menu();
     void change_window_decorator(const std::string& decorator);
-    std::string detect_window_decorator();
+    std::string detect_window_decorator(const std::string& wm = "");
     bool monitor_state();
     void signal_handler(int sig);
     void start_compiz_setsid();
@@ -420,12 +420,11 @@ std::string FusionIcon::detect_window_manager() {
     return "Unknown";
 }
 
-std::string FusionIcon::detect_window_decorator() {
-    std::string wm = detect_window_manager();
+std::string FusionIcon::detect_window_decorator(const std::string& wm) {
+    std::string current_wm = wm.empty() ? detect_window_manager() : wm;
 
     // Если WM не compiz — emerald не используется (он только для compiz)
-    if (wm != "compiz") {
-        // Проверяем gtk-window-decorator (может работать с marco)
+    if (current_wm != "compiz") {
         if (std::system("pgrep -f gtk-window-decorator > /dev/null 2>&1") == 0)
             return "gtk-window-decorator";
         return "none";
@@ -546,7 +545,7 @@ void FusionIcon::rebuild_decorator_menu() {
 
 bool FusionIcon::monitor_state() {
     std::string current_wm = detect_window_manager();
-    std::string current_decorator = detect_window_decorator();
+    std::string current_decorator = detect_window_decorator(current_wm);
 
     // Если что-то изменилось — обновляем подсветку
     if (current_wm != last_known_wm || current_decorator != last_known_decorator) {
