@@ -338,7 +338,6 @@ void FusionIcon::on_right_click(guint button, guint time) {
 
 void FusionIcon::change_window_manager(const std::string& wm) {
     g_message("Switching to %s...", wm.c_str());
-    config["selected_wm"] = wm;
 
     try {
         pid_t pid = fork();
@@ -408,22 +407,26 @@ std::string FusionIcon::detect_window_manager() {
 }
 
 std::string FusionIcon::detect_window_decorator() {
-    // pgrep -x для emerald (короткое имя), pgrep -f для gtk-window-decorator
-    // Исключаем свой PID чтобы не матчится сам fusion-icon2
-    pid_t my_pid = getpid();
-    char cmd[256];
-    snprintf(cmd, sizeof(cmd), "pgrep -x emerald | grep -v ^%d$ > /dev/null 2>&1", my_pid);
-    if (std::system(cmd) == 0)
+    std::string wm = detect_window_manager();
+
+    // Если WM не compiz — emerald не используется (он только для compiz)
+    if (wm != "compiz") {
+        // Проверяем gtk-window-decorator (может работать с marco)
+        if (std::system("pgrep -f gtk-window-decorator > /dev/null 2>&1") == 0)
+            return "gtk-window-decorator";
+        return "none";
+    }
+
+    // Для compiz проверяем кто запущен
+    if (std::system("pgrep -x emerald > /dev/null 2>&1") == 0)
         return "emerald";
-    snprintf(cmd, sizeof(cmd), "pgrep -f gtk-window-decorator | grep -v ^%d$ > /dev/null 2>&1", my_pid);
-    if (std::system(cmd) == 0)
+    if (std::system("pgrep -f gtk-window-decorator > /dev/null 2>&1") == 0)
         return "gtk-window-decorator";
-    return "Unknown";
+    return "none";
 }
 
 void FusionIcon::change_window_decorator(const std::string& decorator) {
     g_message("Switching decorator to %s...", decorator.c_str());
-    config["selected_decorator"] = decorator;
 
     std::string cmd = "setsid " + decorator + " --replace &";
     int ret = std::system(cmd.c_str());
@@ -509,6 +512,8 @@ void FusionIcon::rebuild_decorator_menu() {
         auto* img = Gtk::manage(new Gtk::Image());
         img->set_from_icon_name(icon_name, Gtk::ICON_SIZE_MENU);
         std::string label = (current_decorator == dec) ? ("[ " + dec + " ]") : dec;
+        if (current_decorator == "none" && dec == "gtk-window-decorator")
+            label = "[ gtk-window-decorator ]";
         auto* item = Gtk::manage(new Gtk::ImageMenuItem(*img, label));
         item->set_sensitive(sensitive);
         item->signal_activate().connect(sigc::bind(sigc::mem_fun(*this, &FusionIcon::change_window_decorator), dec));
@@ -554,6 +559,11 @@ bool FusionIcon::monitor_state() {
         // Пересоздаём пункты подменю
         rebuild_wm_menu();
         rebuild_decorator_menu();
+
+        // Сохраняем только после подтверждения реального состояния
+        config["selected_wm"] = current_wm;
+        config["selected_decorator"] = current_decorator;
+        save_config();
     }
 
     if (active_monitoring) {

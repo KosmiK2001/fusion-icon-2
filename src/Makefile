@@ -2,11 +2,16 @@ CC = c++
 
 CFLAGS = -Os -march=core2 -pipe -pthread -s -Wl,--as-needed -Wl,--sort-common -Wl,--enable-new-dtags -Wl,--reduce-memory-overheads -flto
 
-# Путь к иконкам, можно переопределить через CFLAGS или ebuild
 ICON_DIR ?= /usr/share/fusion-icon2
+USE_GSETTINGS ?= 0
+
+ifeq ($(USE_GSETTINGS),1)
+	CFLAGS += -DUSE_GSETTINGS
+	LIBS = $(shell pkg-config --libs glib-2.0 gobject-2.0)
+endif
 
 all: fusion_icon.cpp
-	$(CC) fusion_icon.cpp $(CFLAGS) -DICON_DIR=\"$(ICON_DIR)\" `pkg-config gtkmm-3.0 --cflags --libs`  -o fusion-icon2
+	$(CC) fusion_icon.cpp $(CFLAGS) -DICON_DIR=\"$(ICON_DIR)\" `pkg-config gtkmm-3.0 --cflags --libs` $(LIBS) -o fusion-icon2
 	strip -s fusion-icon2
 	upx -9 --ultra-brute fusion-icon2
 
