@@ -338,6 +338,7 @@ void FusionIcon::on_right_click(guint button, guint time) {
 
 void FusionIcon::change_window_manager(const std::string& wm) {
     g_message("Switching to %s...", wm.c_str());
+    config["selected_wm"] = wm;
 
     try {
         pid_t pid = fork();
@@ -422,6 +423,7 @@ std::string FusionIcon::detect_window_decorator() {
 
 void FusionIcon::change_window_decorator(const std::string& decorator) {
     g_message("Switching decorator to %s...", decorator.c_str());
+    config["selected_decorator"] = decorator;
 
     std::string cmd = "setsid " + decorator + " --replace &";
     int ret = std::system(cmd.c_str());
@@ -618,7 +620,6 @@ void FusionIcon::load_config() {
             }
             std::string key = line.substr(0, eq);
             std::string val = line.substr(eq + 1);
-            // Проверяем на мусор
             if (key.find_first_not_of("abcdefghijklmnopqrstuvwxyz_") != std::string::npos) {
                 g_warning("Corrupted config at line %d, recreating...", line_num);
                 file.close();
@@ -631,6 +632,20 @@ void FusionIcon::load_config() {
         file.close();
         g_message("Config loaded: %s", config_path.c_str());
     }
+
+    // Дефолты из текущего состояния если ключей нет
+    if (config.find("selected_wm") == config.end())
+        config["selected_wm"] = detect_window_manager();
+    if (config.find("selected_decorator") == config.end())
+        config["selected_decorator"] = detect_window_decorator();
+    if (config.find("indirect_rendering") == config.end())
+        config["indirect_rendering"] = "false";
+    if (config.find("loose_binding") == config.end())
+        config["loose_binding"] = "false";
+    if (config.find("force_composition_pipeline") == config.end())
+        config["force_composition_pipeline"] = "false";
+    if (config.find("force_full_composition_pipeline") == config.end())
+        config["force_full_composition_pipeline"] = "false";
 }
 
 int main(int argc, char* argv[]) {
