@@ -3,6 +3,9 @@
 #include <cstdlib>
 #include <csignal>
 #include <unistd.h>
+#include <fstream>
+#include <sstream>
+#include <map>
 
 bool debug_mode = false;
 
@@ -24,6 +27,8 @@ public:
     std::string detect_desktop_name();
     std::string detect_window_manager();
     void clean_exit();
+    void save_config();
+    void load_config();
 
 private:
     Glib::RefPtr<Gtk::StatusIcon> icon;
@@ -59,12 +64,26 @@ private:
 
     Gtk::Menu nvidia_menu;
     Gtk::ImageMenuItem* item_nvidia;
+
+    Gtk::CheckMenuItem* item_fcp_ptr;
+    Gtk::CheckMenuItem* item_ffcp_ptr;
+
+    std::map<std::string, std::string> config;
+    std::string config_path;
 };
 
 FusionIcon* global_fusion_icon = nullptr;
 
 FusionIcon::FusionIcon() : compiz_restarted(false), compiz_started_by_fusion_icon(false),
-    indirect_rendering(false), loose_binding(false), active_monitoring(false) {
+    indirect_rendering(false), loose_binding(false), active_monitoring(false),
+    item_fcp_ptr(nullptr), item_ffcp_ptr(nullptr) {
+    // Путь к конфигу
+    const char* home = getenv("HOME");
+    config_path = home ? std::string(home) + "/.config/fusion-icon2/config" : "";
+
+    // Загружаем настройки
+    load_config();
+
     icon = Gtk::StatusIcon::create(Gdk::Pixbuf::create_from_file(ICON_DIR "/fusion-icon.png"));
     icon->set_visible(true);
 
@@ -155,15 +174,26 @@ FusionIcon::FusionIcon() : compiz_restarted(false), compiz_started_by_fusion_ico
         item_compiz_options->set_submenu(compiz_options_menu);
 
         item_indirect.set_label("Indirect Rendering");
+        // Восстанавливаем из конфига
+        if (config["indirect_rendering"] == "true") {
+            indirect_rendering = true;
+            item_indirect.set_active(true);
+        }
         item_indirect.signal_toggled().connect([this]() {
             indirect_rendering = item_indirect.get_active();
+            config["indirect_rendering"] = indirect_rendering ? "true" : "false";
             g_message("Indirect Rendering: %s", indirect_rendering ? "ON" : "OFF");
         });
         compiz_options_menu.append(item_indirect);
 
         item_loose.set_label("Loose Binding");
+        if (config["loose_binding"] == "true") {
+            loose_binding = true;
+            item_loose.set_active(true);
+        }
         item_loose.signal_toggled().connect([this]() {
             loose_binding = item_loose.get_active();
+            config["loose_binding"] = loose_binding ? "true" : "false";
             g_message("Loose Binding: %s", loose_binding ? "ON" : "OFF");
         });
         compiz_options_menu.append(item_loose);
@@ -197,7 +227,9 @@ FusionIcon::FusionIcon() : compiz_restarted(false), compiz_started_by_fusion_ico
 
         // Force Composition Pipeline
         auto* item_fcp = Gtk::manage(new Gtk::CheckMenuItem("Force Composition Pipeline"));
+        item_fcp_ptr = item_fcp;
         item_fcp->signal_toggled().connect([this, item_fcp]() {
+            config["force_composition_pipeline"] = item_fcp->get_active() ? "true" : "false";
             if (item_fcp->get_active()) {
                 int r = std::system("nvidia-settings --assign 'CurrentMetaMode=DPY-1: nvidia-auto-select @1920x1080 +0+0 {ForceCompositionPipeline=On,ForceFullCompositionPipeline=Off}' > /dev/null 2>&1"); (void)r;
                 FILE* p = popen("nvidia-settings -q CurrentMetaMode 2>/dev/null | grep -o 'ForceCompositionPipeline=[A-Za-z]*' | cut -d= -f2", "r");
@@ -220,7 +252,9 @@ FusionIcon::FusionIcon() : compiz_restarted(false), compiz_started_by_fusion_ico
 
         // Force Full Composition Pipeline
         auto* item_ffcp = Gtk::manage(new Gtk::CheckMenuItem("Force Full Composition Pipeline"));
+        item_ffcp_ptr = item_ffcp;
         item_ffcp->signal_toggled().connect([this, item_fcp, item_ffcp]() {
+            config["force_full_composition_pipeline"] = item_ffcp->get_active() ? "true" : "false";
             if (item_ffcp->get_active()) {
                 item_fcp->set_active(true);
                 item_fcp->set_sensitive(false);
@@ -542,8 +576,61 @@ void FusionIcon::signal_handler(int sig) {
 }
 
 void FusionIcon::clean_exit() {
+    save_config();
     g_message("Exiting Fusion-icon-2...");
     Gtk::Main::quit();
+}
+
+void FusionIcon::save_config() {
+    if (config_path.empty()) return;
+
+    // Создаём директорию если нет
+    std::string dir = config_path.substr(0, config_path.find_last_of('/'));
+    int ret = std::system(("mkdir -p " + dir).c_str()); (void)ret;
+
+    std::ofstream file(config_path);
+    if (file.is_open()) {
+        for (auto& pair : config) {
+            file << pair.first << "=" << pair.second << "\n";
+        }
+        file.close();
+        g_message("Config saved: %s", config_path.c_str());
+    }
+}
+
+void FusionIcon::load_config() {
+    if (config_path.empty()) return;
+
+    std::ifstream file(config_path);
+    if (file.is_open()) {
+        std::string line;
+        int line_num = 0;
+        while (std::getline(file, line)) {
+            line_num++;
+            if (line.empty() || line[0] == '#') continue;
+            size_t eq = line.find('=');
+            if (eq == std::string::npos || eq == 0) {
+                g_warning("Corrupted config at line %d, recreating...", line_num);
+                file.close();
+                std::remove(config_path.c_str());
+                config.clear();
+                return;
+            }
+            std::string key = line.substr(0, eq);
+            std::string val = line.substr(eq + 1);
+            // Проверяем на мусор
+            if (key.find_first_not_of("abcdefghijklmnopqrstuvwxyz_") != std::string::npos) {
+                g_warning("Corrupted config at line %d, recreating...", line_num);
+                file.close();
+                std::remove(config_path.c_str());
+                config.clear();
+                return;
+            }
+            config[key] = val;
+        }
+        file.close();
+        g_message("Config loaded: %s", config_path.c_str());
+    }
 }
 
 int main(int argc, char* argv[]) {
