@@ -224,6 +224,29 @@ FusionIcon::FusionIcon() : compiz_restarted(false), compiz_started_by_fusion_ico
         });
         nvidia_menu.append(*item_ffcp);
 
+        // Детект текущего состояния пайплайнов
+        {
+            FILE* pipe = popen("nvidia-settings -q CurrentMetaMode 2>/dev/null", "r");
+            if (pipe) {
+                char buf[512] = {0};
+                std::string output;
+                while (fgets(buf, sizeof(buf), pipe))
+                    output += buf;
+                pclose(pipe);
+
+                bool fcp_on = (output.find("ForceCompositionPipeline=On") != std::string::npos);
+                bool ffcp_on = (output.find("ForceFullCompositionPipeline=On") != std::string::npos);
+
+                if (ffcp_on) {
+                    item_fcp->set_active(true);
+                    item_fcp->set_sensitive(false);
+                    item_ffcp->set_active(true);
+                } else if (fcp_on) {
+                    item_fcp->set_active(true);
+                }
+            }
+        }
+
         menu.append(*item_nvidia);
     }
 
