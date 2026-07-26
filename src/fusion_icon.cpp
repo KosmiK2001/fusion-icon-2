@@ -686,12 +686,6 @@ int main(int argc, char* argv[]) {
             fprintf(stderr, "Unknown argument: %s, ignoring...\n", argv[i]);
     }
 
-    // SIGCHLD handler: автоматически собирает зомби-процессы (WM, декораторы)
-    struct sigaction sa = {};
-    sa.sa_handler = sigchld_handler;
-    sa.sa_flags = SA_RESTART | SA_NOCLDSTOP;
-    sigaction(SIGCHLD, &sa, nullptr);
-
     if (!debug_mode) {
         g_log_set_handler("Gtk", (GLogLevelFlags)(G_LOG_LEVEL_MASK), silent_log, nullptr);
         g_log_set_handler("fusion-icon", (GLogLevelFlags)(G_LOG_LEVEL_MASK), silent_log, nullptr);
@@ -733,5 +727,13 @@ int main(int argc, char* argv[]) {
 
     Gtk::Main kit(argc, argv);
     FusionIcon fusionIcon;
+
+    // SIGCHLD handler: собирает зомби-процессы (WM, декораторы).
+    // Ставим ПОСЛЕ GTK init, чтобы GLib не перезатёр хендлер.
+    struct sigaction sa = {};
+    sa.sa_handler = sigchld_handler;
+    sa.sa_flags = SA_RESTART | SA_NOCLDSTOP;
+    sigaction(SIGCHLD, &sa, nullptr);
+
     Gtk::Main::run();
 }
