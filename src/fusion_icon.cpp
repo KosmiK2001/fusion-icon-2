@@ -18,6 +18,7 @@ public:
     void rebuild_decorator_menu();
     void change_window_decorator(const std::string& decorator);
     std::string detect_window_decorator();
+    bool monitor_state();
     void signal_handler(int sig);
     void start_compiz_setsid();
     std::string detect_desktop_name();
@@ -47,6 +48,10 @@ private:
     bool indirect_rendering;
     bool loose_binding;
 
+    std::string last_known_wm;
+    std::string last_known_decorator;
+    bool active_monitoring;
+
     Gtk::Menu compiz_options_menu;
     Gtk::ImageMenuItem* item_compiz_options;
     Gtk::CheckMenuItem item_indirect, item_loose;
@@ -55,7 +60,7 @@ private:
 FusionIcon* global_fusion_icon = nullptr;
 
 FusionIcon::FusionIcon() : compiz_restarted(false), compiz_started_by_fusion_icon(false),
-    indirect_rendering(false), loose_binding(false) {
+    indirect_rendering(false), loose_binding(false), active_monitoring(false) {
     icon = Gtk::StatusIcon::create(Gdk::Pixbuf::create_from_file(ICON_DIR "/fusion-icon.png"));
     icon->set_visible(true);
 
@@ -190,6 +195,11 @@ FusionIcon::FusionIcon() : compiz_restarted(false), compiz_started_by_fusion_ico
             global_fusion_icon->signal_handler(sig);
         }
     });
+
+    // Запускаем фоновый мониторинг — каждые 2 сек проверяем состояние
+    last_known_wm = detect_window_manager();
+    last_known_decorator = detect_window_decorator();
+    Glib::signal_timeout().connect(sigc::mem_fun(*this, &FusionIcon::monitor_state), 2000);
 }
 
 void FusionIcon::on_left_click() {
@@ -228,6 +238,8 @@ void FusionIcon::change_window_manager(const std::string& wm) {
             _exit(1);
         } else if (pid > 0) {
             g_message("%s started with PID %d", wm.c_str(), pid);
+            // Переключаемся в активный режим мониторинга
+            active_monitoring = true;
             // Проверяем 4 раза по 500мс — если не запустился, повторяем
             std::string check_cmd = "for i in 1 2 3 4; do sleep 0.5; pgrep -x " + wm + " > /dev/null 2>&1 && exit 0; done; notify-send 'Fusion Icon 2' '" + wm + " failed to start, retrying...' && setsid " + wm + " --replace &";
             int ret = std::system(("bash -c '" + check_cmd + "' &").c_str());
@@ -366,6 +378,40 @@ void FusionIcon::rebuild_decorator_menu() {
         add_item("gtk-window-decorator", "preferences-system", true);
 
     decorator_menu.show_all();
+}
+
+bool FusionIcon::monitor_state() {
+    std::string current_wm = detect_window_manager();
+    std::string current_decorator = detect_window_decorator();
+
+    // Если что-то изменилось — обновляем подсветку
+    if (current_wm != last_known_wm || current_decorator != last_known_decorator) {
+        g_message("State changed: WM=%s Decorator=%s", current_wm.c_str(), current_decorator.c_str());
+        last_known_wm = current_wm;
+        last_known_decorator = current_decorator;
+        active_monitoring = false; // Стабилизировались, обратно на медленный режим
+
+        // Обновляем иконку родителя WM
+        auto* parent_img = dynamic_cast<Gtk::Image*>(item_select_wm->get_image());
+        if (parent_img) {
+            if (current_wm == "compiz")
+                parent_img->set_from_icon_name("compiz", Gtk::ICON_SIZE_MENU);
+            else if (current_wm == "marco")
+                parent_img->set_from_icon_name("marco", Gtk::ICON_SIZE_MENU);
+            else if (current_wm == "metacity")
+                parent_img->set_from_icon_name("metacity", Gtk::ICON_SIZE_MENU);
+            else
+                parent_img->set_from_icon_name("compiz", Gtk::ICON_SIZE_MENU);
+        }
+    }
+
+    // Если в активном режиме — перезапускаем таймер на 500мс
+    if (active_monitoring) {
+        Glib::signal_timeout().connect_once([this]() { this->monitor_state(); }, 500);
+        return false;
+    }
+
+    return true; // Продолжаем с текущим интервалом (2сек)
 }
 
 void FusionIcon::start_compiz_setsid() {
