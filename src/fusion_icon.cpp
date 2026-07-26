@@ -80,7 +80,7 @@ FusionIcon::FusionIcon() : compiz_restarted(false), compiz_started_by_fusion_ico
     if (ccsm_installed) {
         auto* img = Gtk::manage(new Gtk::Image());
         img->set_from_icon_name("ccsm", Gtk::ICON_SIZE_MENU);
-        item_ccsm = Gtk::manage(new Gtk::ImageMenuItem("Settings Manager", *img));
+        item_ccsm = Gtk::manage(new Gtk::ImageMenuItem(*img, "Settings Manager"));
         item_ccsm->signal_activate().connect([]() {
 			try {
 				Glib::spawn_command_line_async("setsid ccsm");
@@ -93,7 +93,7 @@ FusionIcon::FusionIcon() : compiz_restarted(false), compiz_started_by_fusion_ico
     if (emerald_installed) {
         auto* img = Gtk::manage(new Gtk::Image());
         img->set_from_icon_name("emerald-theme-manager", Gtk::ICON_SIZE_MENU);
-        item_emerald = Gtk::manage(new Gtk::ImageMenuItem("Emerald Theme Manager", *img));
+        item_emerald = Gtk::manage(new Gtk::ImageMenuItem(*img, "Emerald Theme Manager"));
         item_emerald->signal_activate().connect([]() {
 			try {
 				Glib::spawn_command_line_async("setsid emerald-theme-manager");
@@ -108,7 +108,7 @@ FusionIcon::FusionIcon() : compiz_restarted(false), compiz_started_by_fusion_ico
     if (compiz_installed) {
         auto* img = Gtk::manage(new Gtk::Image());
         img->set_from_icon_name("view-refresh", Gtk::ICON_SIZE_MENU);
-        item_restart = Gtk::manage(new Gtk::ImageMenuItem("Reload Window Manager", *img));
+        item_restart = Gtk::manage(new Gtk::ImageMenuItem(*img, "Reload Window Manager"));
 		item_restart->signal_activate().connect([this]() {
 
 		    if (selected_window_manager.empty() ||
@@ -129,7 +129,7 @@ FusionIcon::FusionIcon() : compiz_restarted(false), compiz_started_by_fusion_ico
     {
         auto* img = Gtk::manage(new Gtk::Image());
         img->set_from_icon_name("compiz", Gtk::ICON_SIZE_MENU);
-        item_select_wm = Gtk::manage(new Gtk::ImageMenuItem("Select Window Manager", *img));
+        item_select_wm = Gtk::manage(new Gtk::ImageMenuItem(*img, "Select Window Manager"));
     }
 	item_select_wm->set_submenu(wm_menu);
 
@@ -167,7 +167,7 @@ FusionIcon::FusionIcon() : compiz_restarted(false), compiz_started_by_fusion_ico
         {
             auto* img = Gtk::manage(new Gtk::Image());
             img->set_from_icon_name("compiz", Gtk::ICON_SIZE_MENU);
-            item_compiz_options = Gtk::manage(new Gtk::ImageMenuItem("Compiz Options", *img));
+            item_compiz_options = Gtk::manage(new Gtk::ImageMenuItem(*img, "Compiz Options"));
         }
         item_compiz_options->set_submenu(compiz_options_menu);
 
@@ -191,10 +191,10 @@ FusionIcon::FusionIcon() : compiz_restarted(false), compiz_started_by_fusion_ico
     {
         auto* img = Gtk::manage(new Gtk::Image());
         img->set_from_icon_name("application-exit", Gtk::ICON_SIZE_MENU);
-        item_exit = Gtk::manage(new Gtk::ImageMenuItem("Exit", *img));
+        item_exit = Gtk::manage(new Gtk::ImageMenuItem(*img, "Exit"));
     }
     item_exit->signal_activate().connect(sigc::mem_fun(*this, &FusionIcon::clean_exit));
-    menu.append(item_exit);
+    menu.append(*item_exit);
 
     menu.show_all();
     global_fusion_icon = this;
