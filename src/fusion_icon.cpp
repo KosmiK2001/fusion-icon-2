@@ -56,6 +56,9 @@ private:
     Gtk::Menu compiz_options_menu;
     Gtk::ImageMenuItem* item_compiz_options;
     Gtk::CheckMenuItem item_indirect, item_loose;
+
+    Gtk::Menu nvidia_menu;
+    Gtk::ImageMenuItem* item_nvidia;
 };
 
 FusionIcon* global_fusion_icon = nullptr;
@@ -183,9 +186,6 @@ FusionIcon::FusionIcon() : compiz_restarted(false), compiz_started_by_fusion_ico
 
     // NVIDIA Options submenu
     if (nvidia_installed) {
-        Gtk::Menu nvidia_menu;
-        Gtk::ImageMenuItem* item_nvidia;
-
         {
             auto* img = Gtk::manage(new Gtk::Image());
             img->set_from_icon_name("nvidia", Gtk::ICON_SIZE_MENU);
