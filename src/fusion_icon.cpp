@@ -3,8 +3,10 @@
 #include <cstdlib>
 #include <csignal>
 #include <unistd.h>
-//#include <sstream>
-//#include <fstream>
+
+bool debug_mode = false;
+
+static void silent_log(const gchar*, GLogLevelFlags, const gchar*, gpointer) {}
 
 class FusionIcon {
 public:
@@ -66,7 +68,7 @@ FusionIcon::FusionIcon() : compiz_restarted(false), compiz_started_by_fusion_ico
 	selected_window_manager = window_manager;
 
     if (current_desktop.empty())		{ g_error("DM not detected!!"); }
-    if (current_desktop != "Unknown")	{ g_message("DM: %s", current_desktop.c_str());}
+    if (current_desktop != "Unknown")	{ g_message("DM: %s", current_desktop.c_str()); }
 	else								{ g_warning("Unknow DM!!"); }
 
 	if (window_manager.empty())			{ g_error("WM not detected!!"); }
@@ -294,7 +296,7 @@ void FusionIcon::start_compiz_setsid() {
 }
 
 void FusionIcon::signal_handler(int sig) {
-    std::cout << "Caught signal: " << sig << std::endl;
+    g_message("Caught signal: %d", sig);
     clean_exit();
 }
 
@@ -303,8 +305,21 @@ void FusionIcon::clean_exit() {
     std::exit(0);
 }
 
-int main() {
-    Gtk::Main kit;
+int main(int argc, char* argv[]) {
+    for (int i = 1; i < argc; i++) {
+        if (std::string(argv[i]) == "-d" || std::string(argv[i]) == "--debug")
+            debug_mode = true;
+        else
+            fprintf(stderr, "Unknown argument: %s, ignoring...\n", argv[i]);
+    }
+
+    if (!debug_mode) {
+        g_log_set_handler("Gtk", (GLogLevelFlags)(G_LOG_LEVEL_MASK), silent_log, nullptr);
+        g_log_set_handler("fusion-icon", (GLogLevelFlags)(G_LOG_LEVEL_MASK), silent_log, nullptr);
+        g_log_set_default_handler(silent_log, nullptr);
+    }
+
+    Gtk::Main kit(argc, argv);
     FusionIcon fusionIcon;
     Gtk::Main::run();
 }
