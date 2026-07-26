@@ -200,10 +200,10 @@ FusionIcon::FusionIcon() : compiz_restarted(false), compiz_started_by_fusion_ico
         item_fcp->signal_toggled().connect([this, item_fcp]() {
             if (item_fcp->get_active()) {
                 g_message("Enabling Force Composition Pipeline...");
-                int r = std::system("xrandr --output $(xrandr | grep ' connected' | head -1 | cut -d' ' -f1) --set ForceCompositionPipeline On 2>/dev/null || true"); (void)r;
+                int r = std::system("nvidia-settings --assign 'CurrentMetaMode=DPY-1: nvidia-auto-select @1920x1080 +0+0 {ForceCompositionPipeline=On,ForceFullCompositionPipeline=Off}' 2>/dev/null"); (void)r;
             } else {
                 g_message("Disabling Force Composition Pipeline...");
-                int r = std::system("xrandr --output $(xrandr | grep ' connected' | head -1 | cut -d' ' -f1) --set ForceCompositionPipeline Off 2>/dev/null || true"); (void)r;
+                int r = std::system("nvidia-settings --assign 'CurrentMetaMode=DPY-1: nvidia-auto-select @1920x1080 +0+0 {ForceCompositionPipeline=Off,ForceFullCompositionPipeline=Off}' 2>/dev/null"); (void)r;
             }
         });
         nvidia_menu.append(*item_fcp);
@@ -215,11 +215,11 @@ FusionIcon::FusionIcon() : compiz_restarted(false), compiz_started_by_fusion_ico
                 g_message("Enabling Force Full Composition Pipeline...");
                 item_fcp->set_active(true);
                 item_fcp->set_sensitive(false);
-                int r = std::system("xrandr --output $(xrandr | grep ' connected' | head -1 | cut -d' ' -f1) --set ForceFullCompositionPipeline On 2>/dev/null || true"); (void)r;
+                int r = std::system("nvidia-settings --assign 'CurrentMetaMode=DPY-1: nvidia-auto-select @1920x1080 +0+0 {ForceCompositionPipeline=On,ForceFullCompositionPipeline=On}' 2>/dev/null"); (void)r;
             } else {
                 g_message("Disabling Force Full Composition Pipeline...");
                 item_fcp->set_sensitive(true);
-                int r = std::system("xrandr --output $(xrandr | grep ' connected' | head -1 | cut -d' ' -f1) --set ForceFullCompositionPipeline Off 2>/dev/null || true"); (void)r;
+                int r = std::system("nvidia-settings --assign 'CurrentMetaMode=DPY-1: nvidia-auto-select @1920x1080 +0+0 {ForceCompositionPipeline=Off,ForceFullCompositionPipeline=Off}' 2>/dev/null"); (void)r;
             }
         });
         nvidia_menu.append(*item_ffcp);
