@@ -228,9 +228,9 @@ void FusionIcon::change_window_manager(const std::string& wm) {
             _exit(1);
         } else if (pid > 0) {
             g_message("%s started with PID %d", wm.c_str(), pid);
-            // Через 3 секунды проверяем, запустился ли. Если нет — пробуем ещё раз
-            std::string check_cmd = "sleep 2 && pgrep -x " + wm + " > /dev/null 2>&1 || { notify-send 'Fusion Icon 2' '" + wm + " failed to start, retrying...' && setsid " + wm + " --replace & } &";
-            int ret = std::system(check_cmd.c_str());
+            // Проверяем 4 раза по 500мс — если не запустился, повторяем
+            std::string check_cmd = "for i in 1 2 3 4; do sleep 0.5; pgrep -x " + wm + " > /dev/null 2>&1 && exit 0; done; notify-send 'Fusion Icon 2' '" + wm + " failed to start, retrying...' && setsid " + wm + " --replace &";
+            int ret = std::system(("bash -c '" + check_cmd + "' &").c_str());
             (void)ret;
         } else {
             g_warning("Error forking process for %s", wm.c_str());
@@ -276,8 +276,8 @@ void FusionIcon::change_window_decorator(const std::string& decorator) {
     (void)ret;
 
     std::string pgrep_cmd = (decorator == "emerald") ? "pgrep -x emerald" : "pgrep -f gtk-window-decorator";
-    std::string check_cmd = "sleep 2 && " + pgrep_cmd + " > /dev/null 2>&1 || { notify-send 'Fusion Icon 2' '" + decorator + " failed to start, retrying...' && setsid " + decorator + " --replace & } &";
-    int ret2 = std::system(check_cmd.c_str());
+    std::string check_cmd = "for i in 1 2 3 4; do sleep 0.5; " + pgrep_cmd + " > /dev/null 2>&1 && exit 0; done; notify-send 'Fusion Icon 2' '" + decorator + " failed to start, retrying...' && setsid " + decorator + " --replace &";
+    int ret2 = std::system(("bash -c '" + check_cmd + "' &").c_str());
     (void)ret2;
 }
 
