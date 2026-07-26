@@ -10,6 +10,12 @@
 
 bool debug_mode = false;
 
+// Собирает зомби-детей (WM, декораторы), чтобы не висели в ps
+static void sigchld_handler(int) {
+    int status;
+    while (waitpid(-1, &status, WNOHANG) > 0) {}
+}
+
 static void silent_log(const gchar*, GLogLevelFlags, const gchar*, gpointer) {}
 
 class FusionIcon {
@@ -355,43 +361,29 @@ void FusionIcon::change_window_manager(const std::string& wm) {
     g_message("Switching to %s...", wm.c_str());
 
     try {
-        // Double-fork: промежуточный дочерний сразу завершается,
-        // внук (реальный WM) уходит к init и не становится зомби.
         pid_t pid = fork();
 
         if (pid == 0) {
-            // Промежуточный дочерний процесс
-            pid_t grandchild = fork();
+            setsid();
+            signal(SIGINT, SIG_IGN);
+            signal(SIGHUP, SIG_IGN);
+            signal(SIGTERM, SIG_IGN);
 
-            if (grandchild == 0) {
-                // Внук — запускаем WM
-                setsid();
-                signal(SIGINT, SIG_IGN);
-                signal(SIGHUP, SIG_IGN);
-                signal(SIGTERM, SIG_IGN);
+            std::vector<const char*> args;
+            args.push_back(wm.c_str());
+            args.push_back("--replace");
 
-                std::vector<const char*> args;
-                args.push_back(wm.c_str());
-                args.push_back("--replace");
-
-                if (wm == "compiz") {
-                    if (indirect_rendering) args.push_back("--indirect-rendering");
-                    if (loose_binding) args.push_back("--loose-binding");
-                }
-
-                args.push_back(nullptr);
-
-                execvp(wm.c_str(), const_cast<char* const*>(args.data()));
-                _exit(1);
-            } else if (grandchild > 0) {
-                _exit(0); // Промежуточный завершается, внук → reparent к init
-            } else {
-                _exit(1);
+            if (wm == "compiz") {
+                if (indirect_rendering) args.push_back("--indirect-rendering");
+                if (loose_binding) args.push_back("--loose-binding");
             }
+
+            args.push_back(nullptr);
+
+            execvp(wm.c_str(), const_cast<char* const*>(args.data()));
+            _exit(1);
         } else if (pid > 0) {
-            // Ждём завершения промежуточного дочернего (мгновенно)
-            waitpid(pid, nullptr, 0);
-            g_message("%s started", wm.c_str());
+            g_message("%s started with PID %d", wm.c_str(), pid);
             // Переключаемся в активный режим мониторинга
             active_monitoring = true;
             // Проверяем 4 раза по 500мс — если не запустился, повторяем
@@ -693,6 +685,12 @@ int main(int argc, char* argv[]) {
         else
             fprintf(stderr, "Unknown argument: %s, ignoring...\n", argv[i]);
     }
+
+    // SIGCHLD handler: автоматически собирает зомби-процессы (WM, декораторы)
+    struct sigaction sa = {};
+    sa.sa_handler = sigchld_handler;
+    sa.sa_flags = SA_RESTART | SA_NOCLDSTOP;
+    sigaction(SIGCHLD, &sa, nullptr);
 
     if (!debug_mode) {
         g_log_set_handler("Gtk", (GLogLevelFlags)(G_LOG_LEVEL_MASK), silent_log, nullptr);
