@@ -188,7 +188,9 @@ FusionIcon::FusionIcon() : compiz_restarted(false), compiz_started_by_fusion_ico
     if (nvidia_installed) {
         {
             auto* img = Gtk::manage(new Gtk::Image());
-            img->set(Gdk::Pixbuf::create_from_file(ICON_DIR "/nvidia.png"));
+            Glib::RefPtr<Gdk::Pixbuf> pixbuf = Gdk::Pixbuf::create_from_file(ICON_DIR "/nvidia.png");
+            auto scaled = pixbuf->scale_simple(24, 24, Gdk::INTERP_BILINEAR);
+            img->set(scaled);
             item_nvidia = Gtk::manage(new Gtk::ImageMenuItem(*img, "NVIDIA Options"));
         }
         item_nvidia->set_submenu(nvidia_menu);
@@ -510,12 +512,15 @@ int main(int argc, char* argv[]) {
         g_log_set_default_handler(silent_log, nullptr);
     } else {
         // Выводим информацию о GPU в debug режиме
-        FILE* gpu_pipe = popen("lspci | grep -i 'vga\\|3d' | head -1", "r");
+        FILE* gpu_pipe = popen("lspci | grep -i 'vga\\|3d' | head -1 | sed 's/.*: //'", "r");
         if (gpu_pipe) {
             char gpu_info[256] = {0};
             if (fgets(gpu_info, sizeof(gpu_info), gpu_pipe)) {
                 gpu_info[strcspn(gpu_info, "\n")] = 0;
-                fprintf(stderr, "GPU: %s\n", gpu_info);
+                // Извлекаем только модель (без ревизии)
+                char* rev = strstr(gpu_info, " (rev");
+                if (rev) *rev = 0;
+                fprintf(stderr, "GPU: %s", gpu_info);
             }
             pclose(gpu_pipe);
         }
@@ -525,9 +530,13 @@ int main(int argc, char* argv[]) {
             if (fgets(drv_info, sizeof(drv_info), drv_pipe)) {
                 drv_info[strcspn(drv_info, "\n")] = 0;
                 if (strlen(drv_info) > 0)
-                    fprintf(stderr, "Driver: %s\n", drv_info);
+                    fprintf(stderr, ", Driver: %s\n", drv_info);
+                else
+                    fprintf(stderr, "\n");
             }
             pclose(drv_pipe);
+        } else {
+            fprintf(stderr, "\n");
         }
     }
 
