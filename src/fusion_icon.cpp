@@ -318,7 +318,7 @@ void FusionIcon::rebuild_wm_menu() {
         if (current_wm == "compiz")
             parent_img->set_from_icon_name("compiz", Gtk::ICON_SIZE_MENU);
         else if (current_wm == "marco")
-            parent_img->set_from_icon_name("marco", Gtk::ICON_SIZE_MENU);
+            parent_img->set(Gdk::Pixbuf::create_from_file("/usr/share/fusion-icon2/marco.png"));
         else if (current_wm == "metacity")
             parent_img->set_from_icon_name("metacity", Gtk::ICON_SIZE_MENU);
         else
@@ -333,7 +333,10 @@ void FusionIcon::rebuild_wm_menu() {
 
     auto add_item = [&](const std::string& wm, const char* icon_name) {
         auto* img = Gtk::manage(new Gtk::Image());
-        img->set_from_icon_name(icon_name, Gtk::ICON_SIZE_MENU);
+        if (wm == "marco")
+            img->set(Gdk::Pixbuf::create_from_file("/usr/share/fusion-icon2/marco.png"));
+        else
+            img->set_from_icon_name(icon_name, Gtk::ICON_SIZE_MENU);
         auto* item = Gtk::manage(new Gtk::ImageMenuItem(*img, wm));
 
         // Паддинг имени WM до max_len
