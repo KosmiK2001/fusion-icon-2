@@ -508,6 +508,27 @@ int main(int argc, char* argv[]) {
         g_log_set_handler("Gtk", (GLogLevelFlags)(G_LOG_LEVEL_MASK), silent_log, nullptr);
         g_log_set_handler("fusion-icon", (GLogLevelFlags)(G_LOG_LEVEL_MASK), silent_log, nullptr);
         g_log_set_default_handler(silent_log, nullptr);
+    } else {
+        // Выводим информацию о GPU в debug режиме
+        FILE* gpu_pipe = popen("lspci | grep -i 'vga\\|3d' | head -1", "r");
+        if (gpu_pipe) {
+            char gpu_info[256] = {0};
+            if (fgets(gpu_info, sizeof(gpu_info), gpu_pipe)) {
+                gpu_info[strcspn(gpu_info, "\n")] = 0;
+                fprintf(stderr, "GPU: %s\n", gpu_info);
+            }
+            pclose(gpu_pipe);
+        }
+        FILE* drv_pipe = popen("nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null | head -1", "r");
+        if (drv_pipe) {
+            char drv_info[64] = {0};
+            if (fgets(drv_info, sizeof(drv_info), drv_pipe)) {
+                drv_info[strcspn(drv_info, "\n")] = 0;
+                if (strlen(drv_info) > 0)
+                    fprintf(stderr, "Driver: %s\n", drv_info);
+            }
+            pclose(drv_pipe);
+        }
     }
 
     Gtk::Main kit(argc, argv);
