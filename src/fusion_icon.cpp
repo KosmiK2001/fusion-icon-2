@@ -246,44 +246,19 @@ std::string FusionIcon::detect_desktop_name() {
 }
 
 std::string FusionIcon::detect_window_manager() {
-    // Проверяем через X11 — какой WM реально управляет окнами
-    char result[256];
-    FILE* pipe = popen("xprop -root _NET_WM_NAME 2>/dev/null", "r");
-    if (pipe) {
-        std::string output;
-        while (fgets(result, sizeof(result), pipe))
-            output += result;
-        pclose(pipe);
-
-        if (output.find("compiz") != std::string::npos)
-            return "compiz";
-        if (output.find("Marco") != std::string::npos || output.find("marco") != std::string::npos)
-            return "marco";
-        if (output.find("Metacity") != std::string::npos || output.find("metacity") != std::string::npos)
-            return "metacity";
+    const char* wm_list[] = {"compiz", "marco", "metacity"};
+    for (const char* wm : wm_list) {
+        std::string cmd = "ps aux | grep -v grep | grep -q " + std::string(wm);
+        if (std::system(cmd.c_str()) == 0)
+            return wm;
     }
     return "Unknown";
 }
 
 std::string FusionIcon::detect_window_decorator() {
-    // Проверяем через X11 — какой декоратор реально управляет окнами
-    char result[256];
-    FILE* pipe = popen("xprop -root _NET_WM_NAME 2>/dev/null", "r");
-    if (pipe) {
-        std::string output;
-        while (fgets(result, sizeof(result), pipe))
-            output += result;
-        pclose(pipe);
-
-        if (output.find("emerald") != std::string::npos)
-            return "emerald";
-        if (output.find("gtk-window-decorator") != std::string::npos)
-            return "gtk-window-decorator";
-    }
-    // Fallback — проверяем pgrep
-    if (std::system("pgrep -x emerald > /dev/null 2>&1") == 0)
+    if (std::system("ps aux | grep -v grep | grep -q emerald") == 0)
         return "emerald";
-    if (std::system("pgrep -f gtk-window-decorator > /dev/null 2>&1") == 0)
+    if (std::system("ps aux | grep -v grep | grep -q gtk-window-decorator") == 0)
         return "gtk-window-decorator";
     return "Unknown";
 }
