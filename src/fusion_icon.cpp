@@ -14,6 +14,7 @@ public:
     void on_left_click();
     void on_right_click(guint button, guint time);
     void change_window_manager(const std::string& wm);
+    void rebuild_wm_menu();
     void signal_handler(int sig);
     void start_compiz_setsid();
     std::string detect_desktop_name();
@@ -25,12 +26,11 @@ private:
     Gtk::Menu menu;
     Gtk::ImageMenuItem* item_restart;
     Gtk::ImageMenuItem* item_exit;
-	Gtk::Menu wm_menu;
-	Gtk::ImageMenuItem* item_select_wm;
-	Gtk::RadioMenuItem::Group wm_group;
     Gtk::ImageMenuItem* item_ccsm;
     Gtk::ImageMenuItem* item_emerald;
     Gtk::SeparatorMenuItem separator1, separator2;
+    Gtk::Menu wm_menu;
+    Gtk::ImageMenuItem* item_select_wm;
     bool compiz_installed;
     bool ccsm_installed;
     bool metacity_installed;
@@ -40,14 +40,12 @@ private:
     bool compiz_started_by_fusion_icon;
     bool indirect_rendering;
     bool loose_binding;
-	std::string selected_window_manager;
 
     Gtk::Menu compiz_options_menu;
     Gtk::ImageMenuItem* item_compiz_options;
     Gtk::CheckMenuItem item_indirect, item_loose;
 };
 
-// Глобальный указатель на объект FusionIcon
 FusionIcon* global_fusion_icon = nullptr;
 
 FusionIcon::FusionIcon() : compiz_restarted(false), compiz_started_by_fusion_icon(false),
@@ -55,17 +53,14 @@ FusionIcon::FusionIcon() : compiz_restarted(false), compiz_started_by_fusion_ico
     icon = Gtk::StatusIcon::create(Gdk::Pixbuf::create_from_file("/usr/share/icons/hicolor/48x48/apps/fusion-icon.png"));
     icon->set_visible(true);
 
-    // Проверка наличия программ
     compiz_installed = (std::system("which compiz > /dev/null 2>&1") == 0);
     ccsm_installed = (std::system("which ccsm > /dev/null 2>&1") == 0);
     metacity_installed = (std::system("which metacity > /dev/null 2>&1") == 0);
     marco_installed = (std::system("which marco > /dev/null 2>&1") == 0);
     emerald_installed = (std::system("which emerald-theme-manager > /dev/null 2>&1") == 0);
 
-    // Определяем текущее окружение
     std::string current_desktop = detect_desktop_name();
     std::string window_manager = detect_window_manager();
-	selected_window_manager = window_manager;
 
     if (current_desktop.empty())		{ g_error("DM not detected!!"); }
     if (current_desktop != "Unknown")	{ g_message("DM: %s", current_desktop.c_str()); }
@@ -75,7 +70,6 @@ FusionIcon::FusionIcon() : compiz_restarted(false), compiz_started_by_fusion_ico
     if (window_manager != "Unknown")	{ g_message("WM: %s", window_manager.c_str()); }
 	else								{ g_warning("No WM detected at all!"); start_compiz_setsid(); }
 
-    // Подключаем сигналы кликов
     icon->signal_activate().connect(sigc::mem_fun(*this, &FusionIcon::on_left_click));
     icon->signal_popup_menu().connect(sigc::mem_fun(*this, &FusionIcon::on_right_click));
 
@@ -110,57 +104,27 @@ FusionIcon::FusionIcon() : compiz_restarted(false), compiz_started_by_fusion_ico
     if (compiz_installed) {
         auto* img = Gtk::manage(new Gtk::Image());
         img->set_from_icon_name("view-refresh", Gtk::ICON_SIZE_MENU);
-        item_restart = Gtk::manage(new Gtk::ImageMenuItem(*img, "Reload Window Manager"));
-		item_restart->signal_activate().connect([this]() {
-
-		    if (selected_window_manager.empty() ||
-	        selected_window_manager == "Unknown")
-		    {
-		        g_warning("No window manager selected.");
-	        	return;
-		    }
-
-	    change_window_manager(selected_window_manager);
-	    compiz_restarted = true;
-	});
+        item_restart = Gtk::manage(new Gtk::ImageMenuItem(*img, "Restart Compiz"));
+        item_restart->signal_activate().connect([this]() {
+			try {
+				Glib::spawn_command_line_async("setsid compiz --replace");
+				g_message("Restarting Compiz...");
+			} catch (const Glib::Error& error) { g_warning("Error Compiz restart: %s", error.what().c_str()); }
+            compiz_restarted = true;
+        });
         menu.append(*item_restart);
     }
 
     menu.append(separator2);
 
+    // Select Window Manager submenu
     {
         auto* img = Gtk::manage(new Gtk::Image());
         img->set_from_icon_name("compiz", Gtk::ICON_SIZE_MENU);
         item_select_wm = Gtk::manage(new Gtk::ImageMenuItem(*img, "Select Window Manager"));
     }
-	item_select_wm->set_submenu(wm_menu);
-
-	auto add_wm =
-	[&](const std::string& wm)
-	{
-	    auto *item =
-	        Gtk::manage(new Gtk::RadioMenuItem(wm_group, wm));
-
-	    if (wm == selected_window_manager)
-	        item->set_active(true);
-
-	    item->signal_activate().connect(
-        	sigc::bind(
-	            sigc::mem_fun(*this,
-	            &FusionIcon::change_window_manager),
-	            wm));
-
-	    wm_menu.append(*item);
-	};
-
-	if (compiz_installed)
-    	add_wm("Compiz");
-
-	if (marco_installed)
-	    add_wm("Marco");
-
-	if (metacity_installed)
-	    add_wm("Metacity");
+    item_select_wm->set_submenu(wm_menu);
+    wm_menu.signal_show().connect(sigc::mem_fun(*this, &FusionIcon::rebuild_wm_menu));
 
     menu.append(*item_select_wm);
 
@@ -218,46 +182,33 @@ void FusionIcon::on_right_click(guint button, guint time) {
 }
 
 void FusionIcon::change_window_manager(const std::string& wm) {
-	selected_window_manager = wm;
     g_message("Switching to %s...", wm.c_str());
 
     try {
-        // Создаем fork процесса
         pid_t pid = fork();
 
         if (pid == 0) {
-            // Дочерний процесс
-            // Создаем новую сессию, чтобы отсоединить от терминала
             setsid();
-
-            // Устанавливаем обработчики сигналов на игнорирование
             signal(SIGINT, SIG_IGN);
             signal(SIGHUP, SIG_IGN);
             signal(SIGTERM, SIG_IGN);
 
-            // Подготавливаем аргументы для execvp
             std::vector<const char*> args;
             args.push_back(wm.c_str());
             args.push_back("--replace");
 
-            // Добавляем опции Compiz если выбран Compiz
-            if (wm == "Compiz") {
+            if (wm == "compiz") {
                 if (indirect_rendering) args.push_back("--indirect-rendering");
                 if (loose_binding) args.push_back("--loose-binding");
             }
 
             args.push_back(nullptr);
 
-            // Выполняем замену текущего процесса на wm
             execvp(wm.c_str(), const_cast<char* const*>(args.data()));
-
-            // Если execvp вернул управление, значит произошла ошибка
             _exit(1);
         } else if (pid > 0) {
-            // Родительский процесс
             g_message("%s started with PID %d", wm.c_str(), pid);
         } else {
-            // Ошибка fork
             g_warning("Error forking process for %s", wm.c_str());
         }
     } catch (const std::exception& error) {
@@ -283,14 +234,66 @@ std::string FusionIcon::detect_window_manager() {
     return "Unknown";
 }
 
+void FusionIcon::rebuild_wm_menu() {
+    auto children = wm_menu.get_children();
+    for (auto* child : children)
+        wm_menu.remove(*child);
+
+    std::string current_wm = detect_window_manager();
+
+    auto* parent_img = dynamic_cast<Gtk::Image*>(item_select_wm->get_image());
+    if (parent_img) {
+        if (current_wm == "compiz")
+            parent_img->set_from_icon_name("compiz", Gtk::ICON_SIZE_MENU);
+        else if (current_wm == "marco")
+            parent_img->set_from_icon_name("marco", Gtk::ICON_SIZE_MENU);
+        else if (current_wm == "metacity")
+            parent_img->set_from_icon_name("metacity", Gtk::ICON_SIZE_MENU);
+        else
+            parent_img->set_from_icon_name("compiz", Gtk::ICON_SIZE_MENU);
+    }
+
+    // Вычисляем максимальную длину для выравнивания
+    size_t max_len = 0;
+    if (compiz_installed) max_len = std::max(max_len, std::string("compiz").size());
+    if (marco_installed) max_len = std::max(max_len, std::string("marco").size());
+    if (metacity_installed) max_len = std::max(max_len, std::string("metacity").size());
+
+    auto add_item = [&](const std::string& wm, const char* icon_name) {
+        auto* img = Gtk::manage(new Gtk::Image());
+        img->set_from_icon_name(icon_name, Gtk::ICON_SIZE_MENU);
+        auto* item = Gtk::manage(new Gtk::ImageMenuItem(*img, wm));
+
+        // Паддинг имени WM до max_len
+        std::string padded = wm + std::string(max_len - wm.size(), ' ');
+
+        Gtk::Label* label = dynamic_cast<Gtk::Label*>(item->get_child());
+        if (label) {
+            label->set_use_markup(true);
+            if (current_wm == wm)
+                label->set_markup("<tt>▶ " + padded + " ◀</tt>");
+            else
+                label->set_markup("<tt>  " + padded + "  </tt>");
+        }
+
+        item->signal_activate().connect(sigc::bind(sigc::mem_fun(*this, &FusionIcon::change_window_manager), wm));
+        wm_menu.append(*item);
+    };
+
+    if (compiz_installed)
+        add_item("compiz", "compiz");
+    if (marco_installed)
+        add_item("marco", "marco");
+    if (metacity_installed)
+        add_item("metacity", "metacity");
+
+    wm_menu.show_all();
+}
+
 void FusionIcon::start_compiz_setsid() {
     if (std::system("pgrep -x compiz > /dev/null 2>&1") != 0) {
         g_message("Запускаем Compiz...");
-        std::string cmd = "setsid compiz --replace";
-        if (indirect_rendering) cmd += " --indirect-rendering";
-        if (loose_binding) cmd += " --loose-binding";
-        cmd += " &";
-        int result = std::system(cmd.c_str());
+        int result = std::system("setsid compiz --replace &");
         compiz_started_by_fusion_icon = true;
     }
 }
@@ -302,7 +305,7 @@ void FusionIcon::signal_handler(int sig) {
 
 void FusionIcon::clean_exit() {
     g_message("Exiting Fusion-icon-2...");
-    std::exit(0);
+    Gtk::Main::quit();
 }
 
 int main(int argc, char* argv[]) {
