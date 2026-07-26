@@ -258,6 +258,21 @@ std::string FusionIcon::detect_desktop_name() {
 }
 
 std::string FusionIcon::detect_window_manager() {
+    // Самый новый запущенный WM = активный
+    char result[256] = {0};
+    FILE* pipe = popen("ps -eo pid,lstart,comm 2>/dev/null | grep -E '[c]ompiz|[m]arco|[m]etacity' | sort -k2,6 | tail -1 | awk '{print $NF}'", "r");
+    if (pipe) {
+        if (fgets(result, sizeof(result), pipe)) {
+            // Убираем перенос строки
+            result[strcspn(result, "\n")] = 0;
+            if (strlen(result) > 0) {
+                pclose(pipe);
+                return std::string(result);
+            }
+        }
+        pclose(pipe);
+    }
+    // Fallback
     const char* wm_list[] = {"compiz", "marco", "metacity"};
     for (const char* wm : wm_list) {
         if (std::system(("pgrep -f " + std::string(wm) + " > /dev/null 2>&1").c_str()) == 0)
