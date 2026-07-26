@@ -9,5 +9,10 @@ all: fusion_icon.cpp
 	strip -s fusion_icon.bin
 	upx -9 --ultra-brute fusion_icon.bin
 
+install: all
+	install -Dm755 fusion_icon.bin $(DESTDIR)/usr/bin/fusion_icon
+	install -Dm644 icons/fusion-icon.png $(DESTDIR)/usr/share/fusion-icon2/fusion-icon.png
+	install -Dm644 icons/marco.png $(DESTDIR)/usr/share/fusion-icon2/marco.png
+
 clean:
 	rm -f *.o fusion_icon.bin

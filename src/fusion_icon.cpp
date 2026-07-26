@@ -15,6 +15,8 @@ public:
     void on_right_click(guint button, guint time);
     void change_window_manager(const std::string& wm);
     void rebuild_wm_menu();
+    void change_window_decorator(const std::string& decorator);
+    std::string detect_window_decorator();
     void signal_handler(int sig);
     void start_compiz_setsid();
     std::string detect_desktop_name();
@@ -31,6 +33,9 @@ private:
     Gtk::SeparatorMenuItem separator1, separator2;
     Gtk::Menu wm_menu;
     Gtk::ImageMenuItem* item_select_wm;
+    Gtk::Menu decorator_menu;
+    Gtk::ImageMenuItem* item_select_decorator;
+    bool gtk_window_decorator_installed;
     bool compiz_installed;
     bool ccsm_installed;
     bool metacity_installed;
@@ -50,7 +55,7 @@ FusionIcon* global_fusion_icon = nullptr;
 
 FusionIcon::FusionIcon() : compiz_restarted(false), compiz_started_by_fusion_icon(false),
     indirect_rendering(false), loose_binding(false) {
-    icon = Gtk::StatusIcon::create(Gdk::Pixbuf::create_from_file("/usr/share/icons/hicolor/48x48/apps/fusion-icon.png"));
+    icon = Gtk::StatusIcon::create(Gdk::Pixbuf::create_from_file("/usr/share/fusion-icon2/fusion-icon.png"));
     icon->set_visible(true);
 
     compiz_installed = (std::system("which compiz > /dev/null 2>&1") == 0);
@@ -58,6 +63,7 @@ FusionIcon::FusionIcon() : compiz_restarted(false), compiz_started_by_fusion_ico
     metacity_installed = (std::system("which metacity > /dev/null 2>&1") == 0);
     marco_installed = (std::system("which marco > /dev/null 2>&1") == 0);
     emerald_installed = (std::system("which emerald-theme-manager > /dev/null 2>&1") == 0);
+    gtk_window_decorator_installed = (std::system("which gtk-window-decorator > /dev/null 2>&1") == 0);
 
     std::string current_desktop = detect_desktop_name();
     std::string window_manager = detect_window_manager();
@@ -154,6 +160,45 @@ FusionIcon::FusionIcon() : compiz_restarted(false), compiz_started_by_fusion_ico
         menu.append(*item_compiz_options);
     }
 
+    // Select Window Decorator submenu
+    if (compiz_installed) {
+        {
+            auto* img = Gtk::manage(new Gtk::Image());
+            img->set_from_icon_name("window-new", Gtk::ICON_SIZE_MENU);
+            item_select_decorator = Gtk::manage(new Gtk::ImageMenuItem(*img, "Select Window Decorator"));
+        }
+        item_select_decorator->set_submenu(decorator_menu);
+        decorator_menu.signal_show().connect([this]() {
+            auto children = decorator_menu.get_children();
+            for (auto* child : children)
+                decorator_menu.remove(*child);
+
+            std::string current_decorator = detect_window_decorator();
+            std::string current_wm = detect_window_manager();
+
+            auto add_item = [&](const std::string& dec, const char* icon_name, bool sensitive = true) {
+                auto* img = Gtk::manage(new Gtk::Image());
+                img->set_from_icon_name(icon_name, Gtk::ICON_SIZE_MENU);
+                std::string label = (current_decorator == dec) ? ("[ " + dec + " ]") : dec;
+                auto* item = Gtk::manage(new Gtk::ImageMenuItem(*img, label));
+                item->set_sensitive(sensitive);
+                item->signal_activate().connect(sigc::bind(sigc::mem_fun(*this, &FusionIcon::change_window_decorator), dec));
+                decorator_menu.append(*item);
+            };
+
+            bool is_compiz = (current_wm == "compiz");
+
+            if (emerald_installed)
+                add_item("emerald", "emerald-theme-manager", is_compiz);
+            if (gtk_window_decorator_installed)
+                add_item("gtk-window-decorator", "preferences-system", true);
+
+            decorator_menu.show_all();
+        });
+
+        menu.append(*item_select_decorator);
+    }
+
     {
         auto* img = Gtk::manage(new Gtk::Image());
         img->set_from_icon_name("application-exit", Gtk::ICON_SIZE_MENU);
@@ -208,6 +253,10 @@ void FusionIcon::change_window_manager(const std::string& wm) {
             _exit(1);
         } else if (pid > 0) {
             g_message("%s started with PID %d", wm.c_str(), pid);
+            // Через 3 секунды проверяем, запустился ли. Если нет — пробуем ещё раз
+            std::string check_cmd = "sleep 3 && pgrep -x " + wm + " > /dev/null 2>&1 || { notify-send 'Fusion Icon 2' '" + wm + " failed to start, retrying...' && setsid " + wm + " --replace & } &";
+            int ret = std::system(check_cmd.c_str());
+            (void)ret;
         } else {
             g_warning("Error forking process for %s", wm.c_str());
         }
@@ -232,6 +281,29 @@ std::string FusionIcon::detect_window_manager() {
     }
 
     return "Unknown";
+}
+
+std::string FusionIcon::detect_window_decorator() {
+    if (std::system("pgrep -x emerald > /dev/null 2>&1") == 0)
+        return "emerald";
+    if (std::system("pgrep -f gtk-window-decorator > /dev/null 2>&1") == 0)
+        return "gtk-window-decorator";
+    return "Unknown";
+}
+
+void FusionIcon::change_window_decorator(const std::string& decorator) {
+    g_message("Switching decorator to %s...", decorator.c_str());
+
+    // Просто запускаем с --replace, пусть победит сильнейший
+    std::string cmd = "setsid " + decorator + " --replace &";
+    int ret = std::system(cmd.c_str());
+    (void)ret;
+
+    // Через 3 секунды проверяем, запустился ли. Если нет — пробуем ещё раз
+    std::string pgrep_cmd = (decorator == "emerald") ? "pgrep -x emerald" : "pgrep -f gtk-window-decorator";
+    std::string check_cmd = "sleep 3 && " + pgrep_cmd + " > /dev/null 2>&1 || { notify-send 'Fusion Icon 2' '" + decorator + " failed to start, retrying...' && setsid " + decorator + " --replace & } &";
+    int ret2 = std::system(check_cmd.c_str());
+    (void)ret2;
 }
 
 void FusionIcon::rebuild_wm_menu() {
