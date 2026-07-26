@@ -55,7 +55,7 @@ FusionIcon* global_fusion_icon = nullptr;
 
 FusionIcon::FusionIcon() : compiz_restarted(false), compiz_started_by_fusion_icon(false),
     indirect_rendering(false), loose_binding(false) {
-    icon = Gtk::StatusIcon::create(Gdk::Pixbuf::create_from_file("ICON_DIR/fusion-icon.png"));
+    icon = Gtk::StatusIcon::create(Gdk::Pixbuf::create_from_file(ICON_DIR "/fusion-icon.png"));
     icon->set_visible(true);
 
     compiz_installed = (std::system("which compiz > /dev/null 2>&1") == 0);
@@ -318,7 +318,7 @@ void FusionIcon::rebuild_wm_menu() {
         if (current_wm == "compiz")
             parent_img->set_from_icon_name("compiz", Gtk::ICON_SIZE_MENU);
         else if (current_wm == "marco")
-            parent_img->set(Gdk::Pixbuf::create_from_file("ICON_DIR/marco.png"));
+            parent_img->set(Gdk::Pixbuf::create_from_file(ICON_DIR "/marco.png"));
         else if (current_wm == "metacity")
             parent_img->set_from_icon_name("metacity", Gtk::ICON_SIZE_MENU);
         else
@@ -334,7 +334,7 @@ void FusionIcon::rebuild_wm_menu() {
     auto add_item = [&](const std::string& wm, const char* icon_name) {
         auto* img = Gtk::manage(new Gtk::Image());
         if (wm == "marco")
-            img->set(Gdk::Pixbuf::create_from_file("ICON_DIR/marco.png"));
+            img->set(Gdk::Pixbuf::create_from_file(ICON_DIR "/marco.png"));
         else
             img->set_from_icon_name(icon_name, Gtk::ICON_SIZE_MENU);
         auto* item = Gtk::manage(new Gtk::ImageMenuItem(*img, wm));
