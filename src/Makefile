@@ -14,6 +14,7 @@ install: all
 	install -Dm755 fusion-icon2 $(DESTDIR)/usr/bin/fusion-icon2
 	install -Dm644 icons/fusion-icon.png $(DESTDIR)$(ICON_DIR)/fusion-icon.png
 	install -Dm644 icons/marco.png $(DESTDIR)$(ICON_DIR)/marco.png
+	install -Dm644 fusion-icon2.desktop $(DESTDIR)/usr/share/applications/fusion-icon2.desktop
 
 clean:
 	rm -f *.o fusion-icon2

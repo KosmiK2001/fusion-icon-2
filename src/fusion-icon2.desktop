@@ -1,0 +1,14 @@
+[Desktop Entry]
+Name=Fusion Icon 2
+Comment=Start and manage Compiz window managers
+Exec=fusion-icon2
+Icon=fusion-icon
+Terminal=false
+Type=Application
+Categories=Utility;
+X-MATE-Autostart-Phase=WindowManager
+X-MATE-Provides=windowmanager
+X-MATE-WMName=fusion-icon2
+X-GNOME-Autostart-Phase=WindowManager
+X-GNOME-Provides=windowmanager
+X-GNOME-WMName=fusion-icon2
