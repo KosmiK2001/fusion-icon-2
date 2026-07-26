@@ -2,17 +2,18 @@ CC = c++
 
 CFLAGS = -Os -march=core2 -pipe -pthread -s -Wl,--as-needed -Wl,--sort-common -Wl,--enable-new-dtags -Wl,--reduce-memory-overheads -flto
 
+# Путь к иконкам, можно переопределить через CFLAGS или ebuild
+ICON_DIR ?= /usr/share/fusion-icon2
 
 all: fusion_icon.cpp
-##	$(CC) fusion_icon.cpp $(CFLAGS) `pkg-config gtk+-3.0 gtkmm-3.0 appindicator3-0.1 --cflags --libs`  -o fusion_icon.bin
-	$(CC) fusion_icon.cpp $(CFLAGS) `pkg-config gtkmm-3.0 --cflags --libs`  -o fusion_icon.bin
-	strip -s fusion_icon.bin
-	upx -9 --ultra-brute fusion_icon.bin
+	$(CC) fusion_icon.cpp $(CFLAGS) -DICON_DIR=\"$(ICON_DIR)\" `pkg-config gtkmm-3.0 --cflags --libs`  -o fusion-icon2
+	strip -s fusion-icon2
+	upx -9 --ultra-brute fusion-icon2
 
 install: all
-	install -Dm755 fusion_icon.bin $(DESTDIR)/usr/bin/fusion_icon
-	install -Dm644 icons/fusion-icon.png $(DESTDIR)/usr/share/fusion-icon2/fusion-icon.png
-	install -Dm644 icons/marco.png $(DESTDIR)/usr/share/fusion-icon2/marco.png
+	install -Dm755 fusion-icon2 $(DESTDIR)/usr/bin/fusion-icon2
+	install -Dm644 icons/fusion-icon.png $(DESTDIR)$(ICON_DIR)/fusion-icon.png
+	install -Dm644 icons/marco.png $(DESTDIR)$(ICON_DIR)/marco.png
 
 clean:
-	rm -f *.o fusion_icon.bin
+	rm -f *.o fusion-icon2
