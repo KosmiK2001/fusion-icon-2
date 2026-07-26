@@ -200,7 +200,7 @@ FusionIcon::FusionIcon() : compiz_restarted(false), compiz_started_by_fusion_ico
         item_fcp->signal_toggled().connect([this, item_fcp]() {
             if (item_fcp->get_active()) {
                 int r = std::system("nvidia-settings --assign 'CurrentMetaMode=DPY-1: nvidia-auto-select @1920x1080 +0+0 {ForceCompositionPipeline=On,ForceFullCompositionPipeline=Off}' > /dev/null 2>&1"); (void)r;
-                FILE* p = popen("nvidia-settings -q CurrentMetaMode 2>/dev/null | grep -o 'ForceCompositionPipeline=[A-Za-z]*'", "r");
+                FILE* p = popen("nvidia-settings -q CurrentMetaMode 2>/dev/null | grep -o 'ForceCompositionPipeline=[A-Za-z]*' | cut -d= -f2", "r");
                 char buf[64] = {0};
                 std::string state = "unknown";
                 if (p && fgets(buf, sizeof(buf), p)) { buf[strcspn(buf, "\n")] = 0; state = buf; }
@@ -208,7 +208,7 @@ FusionIcon::FusionIcon() : compiz_restarted(false), compiz_started_by_fusion_ico
                 g_message("Force Composition Pipeline... [%s]", state.c_str());
             } else {
                 int r = std::system("nvidia-settings --assign 'CurrentMetaMode=DPY-1: nvidia-auto-select @1920x1080 +0+0 {ForceCompositionPipeline=Off,ForceFullCompositionPipeline=Off}' > /dev/null 2>&1"); (void)r;
-                FILE* p = popen("nvidia-settings -q CurrentMetaMode 2>/dev/null | grep -o 'ForceCompositionPipeline=[A-Za-z]*'", "r");
+                FILE* p = popen("nvidia-settings -q CurrentMetaMode 2>/dev/null | grep -o 'ForceCompositionPipeline=[A-Za-z]*' | cut -d= -f2", "r");
                 char buf[64] = {0};
                 std::string state = "unknown";
                 if (p && fgets(buf, sizeof(buf), p)) { buf[strcspn(buf, "\n")] = 0; state = buf; }
@@ -225,7 +225,7 @@ FusionIcon::FusionIcon() : compiz_restarted(false), compiz_started_by_fusion_ico
                 item_fcp->set_active(true);
                 item_fcp->set_sensitive(false);
                 int r = std::system("nvidia-settings --assign 'CurrentMetaMode=DPY-1: nvidia-auto-select @1920x1080 +0+0 {ForceCompositionPipeline=On,ForceFullCompositionPipeline=On}' > /dev/null 2>&1"); (void)r;
-                FILE* p = popen("nvidia-settings -q CurrentMetaMode 2>/dev/null | grep -o 'ForceFullCompositionPipeline=[A-Za-z]*'", "r");
+                FILE* p = popen("nvidia-settings -q CurrentMetaMode 2>/dev/null | grep -o 'ForceFullCompositionPipeline=[A-Za-z]*' | cut -d= -f2", "r");
                 char buf[64] = {0};
                 std::string state = "unknown";
                 if (p && fgets(buf, sizeof(buf), p)) { buf[strcspn(buf, "\n")] = 0; state = buf; }
@@ -234,7 +234,7 @@ FusionIcon::FusionIcon() : compiz_restarted(false), compiz_started_by_fusion_ico
             } else {
                 item_fcp->set_sensitive(true);
                 int r = std::system("nvidia-settings --assign 'CurrentMetaMode=DPY-1: nvidia-auto-select @1920x1080 +0+0 {ForceCompositionPipeline=Off,ForceFullCompositionPipeline=Off}' > /dev/null 2>&1"); (void)r;
-                FILE* p = popen("nvidia-settings -q CurrentMetaMode 2>/dev/null | grep -o 'ForceFullCompositionPipeline=[A-Za-z]*'", "r");
+                FILE* p = popen("nvidia-settings -q CurrentMetaMode 2>/dev/null | grep -o 'ForceFullCompositionPipeline=[A-Za-z]*' | cut -d= -f2", "r");
                 char buf[64] = {0};
                 std::string state = "unknown";
                 if (p && fgets(buf, sizeof(buf), p)) { buf[strcspn(buf, "\n")] = 0; state = buf; }
