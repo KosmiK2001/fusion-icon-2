@@ -257,13 +257,6 @@ void FusionIcon::change_window_manager(const std::string& wm) {
             std::string check_cmd = "sleep 3 && pgrep -x " + wm + " > /dev/null 2>&1 || { notify-send 'Fusion Icon 2' '" + wm + " failed to start, retrying...' && setsid " + wm + " --replace & } &";
             int ret = std::system(check_cmd.c_str());
             (void)ret;
-
-            // Если переключились на compiz — проверяем декоратор через 2 сек
-            if (wm == "compiz") {
-                std::string dec_check = "sleep 2 && ! pgrep -x emerald > /dev/null 2>&1 && ! pgrep -f gtk-window-decorator > /dev/null 2>&1 && { notify-send 'Fusion Icon 2' 'No window decorator running, starting gtk-window-decorator...' && setsid gtk-window-decorator --replace & } &";
-                int ret2 = std::system(dec_check.c_str());
-                (void)ret2;
-            }
         } else {
             g_warning("Error forking process for %s", wm.c_str());
         }
@@ -370,19 +363,6 @@ void FusionIcon::rebuild_wm_menu() {
         add_item("metacity", "metacity");
 
     wm_menu.show_all();
-
-    // Показываем/прячем декоратор в зависимости от WM
-    item_select_decorator->set_visible(current_wm == "compiz");
-
-    // Если WM не compiz — убиваем внешний декоратор (он не нужен)
-    if (current_wm != "compiz") {
-        std::string dec = detect_window_decorator();
-        if (!dec.empty() && dec != "Unknown") {
-            g_message("Killing decorator %s (not needed for %s)", dec.c_str(), current_wm.c_str());
-            int ret = std::system(("killall -q " + dec).c_str());
-            (void)ret;
-        }
-    }
 }
 
 void FusionIcon::start_compiz_setsid() {
