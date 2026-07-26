@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <csignal>
 #include <unistd.h>
+#include <sys/wait.h>
 #include <fstream>
 #include <sstream>
 #include <map>
@@ -22,6 +23,7 @@ public:
     void change_window_decorator(const std::string& decorator);
     std::string detect_window_decorator(const std::string& wm = "");
     bool monitor_state();
+    bool reap_zombies();
     void signal_handler(int sig);
     void start_compiz_setsid();
     std::string detect_desktop_name();
@@ -339,6 +341,7 @@ FusionIcon::FusionIcon() : compiz_restarted(false), compiz_started_by_fusion_ico
     last_known_wm = detect_window_manager();
     last_known_decorator = detect_window_decorator();
     Glib::signal_timeout().connect(sigc::mem_fun(*this, &FusionIcon::monitor_state), 2000);
+    Glib::signal_timeout().connect(sigc::mem_fun(*this, &FusionIcon::reap_zombies), 1000);
 }
 
 void FusionIcon::on_left_click() {
@@ -578,6 +581,11 @@ void FusionIcon::start_compiz_setsid() {
         int result = std::system("setsid compiz --replace &");
         compiz_started_by_fusion_icon = true;
     }
+}
+
+bool FusionIcon::reap_zombies() {
+    while (waitpid(-1, nullptr, WNOHANG) > 0) {}
+    return true; // продолжаем таймер
 }
 
 void FusionIcon::signal_handler(int sig) {
