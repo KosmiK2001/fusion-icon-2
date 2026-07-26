@@ -255,9 +255,15 @@ std::string FusionIcon::detect_window_manager() {
 }
 
 std::string FusionIcon::detect_window_decorator() {
-    if (std::system("pgrep -f emerald > /dev/null 2>&1") == 0)
+    // pgrep -x для emerald (короткое имя), pgrep -f для gtk-window-decorator
+    // Исключаем свой PID чтобы не матчится сам fusion-icon2
+    pid_t my_pid = getpid();
+    char cmd[256];
+    snprintf(cmd, sizeof(cmd), "pgrep -x emerald | grep -v ^%d$ > /dev/null 2>&1", my_pid);
+    if (std::system(cmd) == 0)
         return "emerald";
-    if (std::system("pgrep -f gtk-window-decorator > /dev/null 2>&1") == 0)
+    snprintf(cmd, sizeof(cmd), "pgrep -f gtk-window-decorator | grep -v ^%d$ > /dev/null 2>&1", my_pid);
+    if (std::system(cmd) == 0)
         return "gtk-window-decorator";
     return "Unknown";
 }
